@@ -12,3 +12,5 @@ pycache/
 *.pyo
 *.pyd
 .pytest_cache/
+artifacts/*.joblib
+!artifacts/lightgbm_credit_model.joblib
