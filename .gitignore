@@ -1,3 +1,14 @@
 data/
 models/
 __pycache__/
+xai-asynch-env/
+.env
+venv/
+env/
+.vscode/
+.idea/
+pycache/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
