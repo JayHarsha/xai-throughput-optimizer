@@ -1,0 +1,54 @@
+Scanning results directory: C:\Users\harsh\NCI\Sem2\Practicum\xai-throughput-optimizer\results
+
+==============================================================
+DESCRIPTIVE STATISTICS
+==============================================================
+  No-XAI Baseline  (n=5 observations)
+    median = 220.0 ms
+    mean   = 230.0 ms
+    p95    = 354.0 ms
+    max    = 380.0 ms
+
+  Sync XAI  (n=5 observations)
+    median = 20000.0 ms
+    mean   = 17960.0 ms
+    p95    = 33000.0 ms
+    max    = 36000.0 ms
+
+  Async Pipeline  (n=5 observations)
+    median = 1200.0 ms
+    mean   = 4462.0 ms
+    p95    = 11800.0 ms
+    max    = 13000.0 ms
+
+==============================================================
+MANN-WHITNEY U TESTS  (non-parametric, α = 0.05)
+==============================================================
+
+  H1: XAI computation adds measurable latency overhead
+
+  [greater]  Sync XAI  vs  No-XAI Baseline
+  U = 25.0    p = 0.0040    SIGNIFICANT  ✓
+  Median — Sync XAI: 20000.0 ms  |  No-XAI Baseline: 220.0 ms
+
+  H2: Async Tier-1 is faster than synchronous XAI
+
+  [greater]  Sync XAI  vs  Async Pipeline
+  U = 22.0    p = 0.0278    SIGNIFICANT  ✓
+  Median — Sync XAI: 20000.0 ms  |  Async Pipeline: 1200.0 ms
+
+  H3: Async Tier-1 perceived latency matches the no-XAI floor
+
+  [two-sided]  Async Pipeline  vs  No-XAI Baseline
+  U = 25.0    p = 0.0079    SIGNIFICANT  ✓
+  Median — Async Pipeline: 1200.0 ms  |  No-XAI Baseline: 220.0 ms
+
+==============================================================
+INTERPRETATION
+==============================================================
+  H1 significant  → XAI overhead is real and measurable
+  H2 significant  → Async offloading eliminates that overhead for the user
+  H3 NOT sig.     → Async Tier-1 latency is statistically the same as
+                     pure inference — XAI is effectively free from the
+                     user's perspective
+

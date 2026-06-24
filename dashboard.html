@@ -392,6 +392,8 @@
     .load-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
     .load-btn.sync-btn:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
     .load-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .load-btn.base-btn:hover:not(:disabled) { border-color: var(--warning); color: var(--warning); }
+    .cell-base { color: var(--warning); font-weight: 600; }
 
     .load-running {
       display: none;
@@ -427,6 +429,58 @@
     .chart-load-wrap { height: 280px; margin-top: 24px; }
 
     hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+
+    /* ── Form sections ──────────────────────────────────────────── */
+    .form-section-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+    }
+    .field-source {
+      font-size: 0.63rem;
+      font-weight: 500;
+      color: var(--warning);
+      background: rgba(245,158,11,0.12);
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin-left: 5px;
+      vertical-align: middle;
+    }
+    details.admin-section {
+      margin-top: 16px;
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    details.admin-section > summary {
+      padding: 9px 14px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      background: var(--deep);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      user-select: none;
+    }
+    details.admin-section > summary::-webkit-details-marker { display: none; }
+    details.admin-section > summary::marker { display: none; }
+    .admin-toggle { display: inline-block; font-size: 0.58rem; transition: transform 0.18s; }
+    details.admin-section[open] .admin-toggle { transform: rotate(90deg); }
+    .admin-grid { padding: 14px 14px 6px; }
+    .admin-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      padding: 4px 14px 12px;
+      font-style: italic;
+      line-height: 1.55;
+    }
   </style>
 </head>
 <body>
@@ -445,36 +499,90 @@
   <section>
     <div class="card">
       <div class="card-title">Loan Application</div>
+
+      <div class="form-section-label">Applicant fills in (online loan portal)</div>
       <div class="form-grid">
         <div class="form-group">
           <label for="f_loan_amnt">Loan Amount ($)</label>
           <input type="number" id="f_loan_amnt" value="27000" min="1000" max="50000" step="100">
         </div>
         <div class="form-group">
+          <label for="f_purpose">Loan Purpose</label>
+          <select id="f_purpose">
+            <option value="debt_consolidation" selected>Debt Consolidation</option>
+            <option value="credit_card">Credit Card Refinancing</option>
+            <option value="home_improvement">Home Improvement</option>
+            <option value="car">Car / Auto</option>
+            <option value="medical">Medical</option>
+            <option value="major_purchase">Major Purchase</option>
+            <option value="vacation">Vacation</option>
+            <option value="moving">Moving / Relocation</option>
+            <option value="house">House</option>
+            <option value="small_business">Small Business</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label for="f_annual_inc">Annual Income ($)</label>
           <input type="number" id="f_annual_inc" value="62000">
         </div>
         <div class="form-group">
-          <label for="f_dti">DTI (%)</label>
-          <input type="number" id="f_dti" value="22.50" step="0.01">
+          <label for="f_emp_length">Employment Length</label>
+          <select id="f_emp_length">
+            <option value="< 1 year">&lt; 1 year</option>
+            <option value="1 year">1 year</option>
+            <option value="2 years">2 years</option>
+            <option value="3 years">3 years</option>
+            <option value="4 years">4 years</option>
+            <option value="5 years" selected>5 years</option>
+            <option value="6 years">6 years</option>
+            <option value="7 years">7 years</option>
+            <option value="8 years">8 years</option>
+            <option value="9 years">9 years</option>
+            <option value="10+ years">10+ years</option>
+          </select>
         </div>
         <div class="form-group">
-          <label for="f_fico">FICO Score</label>
-          <input type="number" id="f_fico" value="680" min="300" max="850">
+          <label for="f_home_ownership">Home Ownership</label>
+          <select id="f_home_ownership">
+            <option value="RENT" selected>Renting</option>
+            <option value="OWN">Own outright</option>
+            <option value="MORTGAGE">Mortgage</option>
+          </select>
         </div>
         <div class="form-group">
-          <label for="f_int_rate">Interest Rate (%)</label>
-          <input type="number" id="f_int_rate" value="12.99" step="0.01">
-        </div>
-        <div class="form-group">
-          <label for="f_term">Term</label>
+          <label for="f_term">Loan Term</label>
           <select id="f_term">
             <option value="36">36 months</option>
             <option value="60">60 months</option>
           </select>
         </div>
       </div>
-      <div class="form-note">Remaining ~79 fields use representative defaults from the LendingClub dataset</div>
+
+      <details class="admin-section">
+        <summary>
+          <span class="admin-toggle">&#9654;</span>
+          &#128274;&nbsp;Underwriter / Admin View &mdash; Credit Bureau &amp; System Data
+          <span style="margin-left:auto;font-weight:400;font-size:0.7rem;opacity:0.8;">hidden from applicant &mdash; editable here for demo</span>
+        </summary>
+        <div class="admin-grid">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="f_fico">FICO Score <span class="field-source">credit bureau</span></label>
+              <input type="number" id="f_fico" value="680" min="300" max="850">
+            </div>
+            <div class="form-group">
+              <label for="f_dti">Debt-to-Income (%) <span class="field-source">calculated</span></label>
+              <input type="number" id="f_dti" value="22.50" step="0.01">
+            </div>
+            <div class="form-group">
+              <label for="f_int_rate">Interest Rate (%) <span class="field-source">assigned by lender</span></label>
+              <input type="number" id="f_int_rate" value="12.99" step="0.01">
+            </div>
+          </div>
+        </div>
+        <div class="admin-note">&#9432;&nbsp; In production, these fields are sourced automatically from credit bureau APIs (Experian / Equifax / TransUnion) and the lender&#39;s own pricing engine &mdash; the applicant never sees or enters them. Remaining ~73 credit history fields (delinquencies, revolving balances, instalment history, credit age, etc.) are pre-filled from LendingClub dataset medians for this demo.</div>
+      </details>
       <div class="btn-row">
         <button class="btn btn-primary" id="btn-async" onclick="submitForm('asynch')">Submit — Async Pipeline</button>
         <button class="btn btn-outline" id="btn-sync"  onclick="submitForm('synch')">Submit — Sync Baseline</button>
@@ -513,6 +621,7 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
         <div style="font-size:1rem;font-weight:700;">Concurrent Load Simulation</div>
+        <button class="btn-link" onclick="exportLoadCSV()" style="margin-right:12px;">Export CSV</button>
         <button class="btn-link" onclick="clearLoadData()">Clear Test Data</button>
       </div>
       <div class="load-subtitle">
@@ -521,12 +630,22 @@
       </div>
 
       <div class="load-row">
+        <span class="load-row-label">No-XAI Baseline:</span>
+        <button class="load-btn base-btn" onclick="runLoad('baseline', 1)">1 User</button>
+        <button class="load-btn base-btn" onclick="runLoad('baseline', 5)">5 Users</button>
+        <button class="load-btn base-btn" onclick="runLoad('baseline', 10)">10 Users</button>
+        <button class="load-btn base-btn" onclick="runLoad('baseline', 25)">25 Users</button>
+        <button class="load-btn base-btn" onclick="runLoad('baseline', 50)">50 Users</button>
+        <button class="load-btn base-btn" onclick="runLoad('baseline', 100)">100 Users</button>
+      </div>
+      <div class="load-row">
         <span class="load-row-label">Sync Baseline:</span>
         <button class="load-btn sync-btn" onclick="runLoad('synch', 1)">1 User</button>
         <button class="load-btn sync-btn" onclick="runLoad('synch', 5)">5 Users</button>
         <button class="load-btn sync-btn" onclick="runLoad('synch', 10)">10 Users</button>
         <button class="load-btn sync-btn" onclick="runLoad('synch', 25)">25 Users</button>
         <button class="load-btn sync-btn" onclick="runLoad('synch', 50)">50 Users</button>
+        <button class="load-btn sync-btn" onclick="runLoad('synch', 100)">100 Users</button>
       </div>
       <div class="load-row">
         <span class="load-row-label">Async Pipeline:</span>
@@ -535,6 +654,7 @@
         <button class="load-btn" onclick="runLoad('asynch', 10)">10 Users</button>
         <button class="load-btn" onclick="runLoad('asynch', 25)">25 Users</button>
         <button class="load-btn" onclick="runLoad('asynch', 50)">50 Users</button>
+        <button class="load-btn" onclick="runLoad('asynch', 100)">100 Users</button>
       </div>
 
       <div class="load-running" id="load-running">
@@ -546,12 +666,12 @@
         <table class="load-table">
           <thead>
             <tr>
-              <th>Pipeline</th><th>Users</th><th>p50 (ms)</th><th>p95 (ms)</th>
+              <th>Pipeline</th><th>Users</th><th>p50 (ms)</th><th>p95 (ms)</th><th>p99 (ms)</th>
               <th>Req/Sec</th><th>OK / Total</th><th>Notes</th>
             </tr>
           </thead>
           <tbody id="load-tbody">
-            <tr class="empty-row"><td colspan="7">No tests run yet — click a button above to start</td></tr>
+            <tr class="empty-row"><td colspan="8">No tests run yet — click a button above to start</td></tr>
           </tbody>
         </table>
       </div>
@@ -572,9 +692,8 @@ const API_BASE = window.location.origin;
 
 const HIDDEN_DEFAULTS = {
   "installment": 1213.0, "grade": "C", "sub_grade": "C2",
-  "emp_length": "5 years", "home_ownership": "RENT",
-  "verification_status": "Verified", "purpose": "debt_consolidation",
-  "addr_state": "IL", "delinq_2yrs": 0.0, "fico_range_high": 684.0,
+  "verification_status": "Verified",
+  "addr_state": "IL", "delinq_2yrs": 0.0,
   "inq_last_6mths": 1.0, "mths_since_last_delinq": 999.0,
   "mths_since_last_record": 999.0, "open_acc": 10.0, "pub_rec": 0.0,
   "revol_bal": 12500.0, "revol_util": 65.0, "total_acc": 20.0,
@@ -625,23 +744,26 @@ let loadRunning = false;
    HELPERS
    ================================================================ */
 function getPayload() {
+  const ficoLow = parseFloat(document.getElementById('f_fico').value);
   return {
     ...HIDDEN_DEFAULTS,
-    loan_amnt:      parseFloat(document.getElementById('f_loan_amnt').value),
-    annual_inc:     parseFloat(document.getElementById('f_annual_inc').value),
-    dti:            parseFloat(document.getElementById('f_dti').value),
-    fico_range_low: parseFloat(document.getElementById('f_fico').value),
-    int_rate:       parseFloat(document.getElementById('f_int_rate').value),
-    term:           parseFloat(document.getElementById('f_term').value),
+    // Applicant-provided fields
+    loan_amnt:       parseFloat(document.getElementById('f_loan_amnt').value),
+    purpose:         document.getElementById('f_purpose').value,
+    annual_inc:      parseFloat(document.getElementById('f_annual_inc').value),
+    emp_length:      document.getElementById('f_emp_length').value,
+    home_ownership:  document.getElementById('f_home_ownership').value,
+    term:            parseFloat(document.getElementById('f_term').value),
+    // Credit bureau / system fields
+    fico_range_low:  ficoLow,
+    fico_range_high: ficoLow + 4,
+    dti:             parseFloat(document.getElementById('f_dti').value),
+    int_rate:        parseFloat(document.getElementById('f_int_rate').value),
   };
 }
 
 function fmtMs(ms) {
   return Math.round(ms).toLocaleString() + 'ms';
-}
-
-function stripPrefix(name) {
-  return name.replace(/^(num__|cat__)/, '');
 }
 
 function getProbColor(prob) {
@@ -672,7 +794,7 @@ function destroyChart(ref) {
 
 function renderShapChart(canvasId, primaryFactors) {
   const factors = (primaryFactors && primaryFactors.primary_risk_factors) || [];
-  const labels  = factors.map(f => stripPrefix(f.feature));
+  const labels  = factors.map(f => f.feature);
   const values  = factors.map(f => f.impact);
   const colors  = values.map(v => v > 0 ? '#ef4444' : '#22c55e');
 
@@ -1024,7 +1146,7 @@ async function runLoad(endpoint, n) {
 
   const runEl = document.getElementById('load-running');
   document.getElementById('load-running-text').textContent =
-    `Running ${n} concurrent ${endpoint === 'synch' ? 'sync' : 'async'} requests…`;
+    `Running ${n} concurrent ${endpoint === 'synch' ? 'sync' : endpoint === 'baseline' ? 'baseline' : 'async'} requests…`;
   runEl.style.display = 'flex';
 
   const payload = getPayload();
@@ -1059,15 +1181,19 @@ async function runLoad(endpoint, n) {
 
   const p50 = Math.round(pctile(latencies, 50));
   const p95 = Math.round(pctile(latencies, 95));
+  const p99 = Math.round(pctile(latencies, 99));
   const rps  = wallSec > 0 ? (okCount / wallSec).toFixed(1) : '0';
 
   const isSync   = endpoint === 'synch';
-  const label    = `${isSync ? 'Sync' : 'Async'}-${n}u`;
-  const cellCls  = isSync ? 'cell-sync' : 'cell-async';
-  const pipeName = isSync ? 'Sync Baseline' : 'Async Pipeline';
-  const rpsCls   = isSync ? 'cell-sync' : 'cell-async';
+  const isBase   = endpoint === 'baseline';
+  const label    = `${isSync ? 'Sync' : isBase ? 'Base' : 'Async'}-${n}u`;
+  const cellCls  = isSync ? 'cell-sync' : isBase ? 'cell-base' : 'cell-async';
+  const pipeName = isSync ? 'Sync Baseline' : isBase ? 'No-XAI Baseline' : 'Async Pipeline';
+  const rpsCls   = isSync ? 'cell-sync' : isBase ? 'cell-base' : 'cell-async';
   const note     = isSync
     ? (n >= 10 ? 'Blocking — high latency expected' : '')
+    : isBase
+    ? 'Pure inference — no XAI overhead'
     : 'Tier 1 latency (user-perceived)';
 
   const tbody = document.getElementById('load-tbody');
@@ -1079,12 +1205,13 @@ async function runLoad(endpoint, n) {
     <td>${n}</td>
     <td>${p50.toLocaleString()}</td>
     <td>${p95.toLocaleString()}</td>
+    <td>${p99.toLocaleString()}</td>
     <td class="${rpsCls}" style="font-weight:700;">${rps}</td>
     <td>${okCount} / ${n}</td>
     <td class="cell-muted">${note}</td>
   </tr>`);
 
-  pushLoadChartData(label, p50, p95);
+  pushLoadChartData(label, p50, p95, p99);
 
   runEl.style.display = 'none';
   loadRunning = false;
@@ -1094,7 +1221,7 @@ async function runLoad(endpoint, n) {
 /* ── Clear load test data ───────────────────────────────────────── */
 function clearLoadData() {
   document.getElementById('load-tbody').innerHTML =
-    '<tr class="empty-row"><td colspan="7">No tests run yet — click a button above to start</td></tr>';
+    '<tr class="empty-row"><td colspan="8">No tests run yet — click a button above to start</td></tr>';
   if (loadSimChart) {
     loadSimChart.data.labels = [];
     loadSimChart.data.datasets.forEach(ds => (ds.data = []));
@@ -1121,6 +1248,13 @@ function initLoadChart() {
           label: 'p95 (ms)',
           data: [],
           backgroundColor: '#f59e0b',
+          borderWidth: 0,
+          borderRadius: 4,
+        },
+        {
+          label: 'p99 (ms)',
+          data: [],
+          backgroundColor: '#ef4444',
           borderWidth: 0,
           borderRadius: 4,
         }
@@ -1159,12 +1293,38 @@ function initLoadChart() {
   });
 }
 
-function pushLoadChartData(label, p50, p95) {
+function pushLoadChartData(label, p50, p95, p99) {
   if (!loadSimChart) return;
   loadSimChart.data.labels.push(label);
   loadSimChart.data.datasets[0].data.push(p50);
   loadSimChart.data.datasets[1].data.push(p95);
+  loadSimChart.data.datasets[2].data.push(p99);
   loadSimChart.update();
+}
+
+/* ── Export load table as CSV ───────────────────────────────────── */
+function exportLoadCSV() {
+  const rows = document.querySelectorAll('#load-tbody tr:not(.empty-row)');
+  if (!rows.length) { alert('No test data to export yet.'); return; }
+
+  const headers = ['Pipeline', 'Users', 'p50_ms', 'p95_ms', 'p99_ms', 'req_per_sec', 'ok', 'total', 'notes'];
+  const lines   = [headers.join(',')];
+
+  rows.forEach(row => {
+    const cells = Array.from(row.querySelectorAll('td')).map(td => {
+      const v = td.textContent.trim().replace(/,/g, '');
+      return /\s/.test(v) ? `"${v}"` : v;
+    });
+    lines.push(cells.join(','));
+  });
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `xai_load_sim_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 /* ================================================================

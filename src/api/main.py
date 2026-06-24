@@ -24,7 +24,8 @@ app.add_middleware(
 
 request_log = {
     "synch": deque(maxlen=200),
-    "asynch": deque(maxlen=200)
+    "asynch": deque(maxlen=200),
+    "baseline": deque(maxlen=200)
 }
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -104,6 +105,26 @@ async def predict_risk_asynch(payload: dict):
         }
     }
 
+@app.post("/predict/baseline")
+async def predict_risk_baseline(payload: dict):
+    """
+    PURE INFERENCE: No XAI computation. Isolates ML prediction overhead
+    from SHAP/counterfactual costs. Used as control group in dissertation benchmarks.
+    """
+    start_time = time.time()
+    df = pd.DataFrame([payload])
+    X_processed = preprocessor.transform(df)
+    probability = model.predict_proba(X_processed)[0][1]
+    tier = "Low" if probability < 0.40 else "Medium" if probability <= 0.60 else "High"
+    latency_ms = (time.time() - start_time) * 1000
+    request_log["baseline"].append(latency_ms)
+    return {
+        "default_probability": round(float(probability), 4),
+        "risk_tier": tier,
+        "api_latency_ms": round(latency_ms, 2),
+        "mode": "baseline_no_xai"
+    }
+
 @app.get("/result/{task_id}")
 async def get_result(task_id: str):
     # 3. Check Redis for the task status
@@ -131,7 +152,8 @@ async def live_metrics():
         }
     return {
         "synch": calc(request_log["synch"]),
-        "asynch": calc(request_log["asynch"])
+        "asynch": calc(request_log["asynch"]),
+        "baseline": calc(request_log["baseline"])
     }
 
 @app.get("/")

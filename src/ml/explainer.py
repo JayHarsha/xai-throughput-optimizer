@@ -2,6 +2,7 @@ import shap
 import joblib
 import os
 import numpy as np
+from src.ml.feature_labels import humanize_feature
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODEL_PATH = os.path.join(BASE_DIR, 'artifacts', 'lightgbm_credit_model.joblib')
@@ -22,7 +23,7 @@ def compute_main_effects(X_processed, feature_names):
     
     total_main = len(main_impacts)
     hidden_main = total_main - 5 if total_main > 5 else 0
-    top_main = [{"feature": f, "impact": round(float(v), 4)} for f, v in main_impacts[:5]]
+    top_main = [{"feature": humanize_feature(f), "impact": round(float(v), 4)} for f, v in main_impacts[:5]]
     
     return {
         "primary_risk_factors": top_main,
@@ -41,7 +42,7 @@ def compute_shap_interactions(X_processed, feature_names):
             val = matrix[i][j] * 2 
             if abs(val) > 0.05: 
                 interactions.append({
-                    "feature_pair": f"{feature_names[i]} <--> {feature_names[j]}",
+                    "feature_pair": f"{humanize_feature(feature_names[i])} × {humanize_feature(feature_names[j])}",
                     "impact": round(float(val), 4)
                 })
                 
@@ -60,9 +61,9 @@ def compute_shap_interactions(X_processed, feature_names):
 import copy
 
 def get_counterfactuals(original_payload, preprocessor, model, current_probability):
-    # If they are already Low Risk, they don't need counterfactuals
-    if current_probability <= 0.50:
-        return {"status": "Not required. Applicant is low risk."}
+    # Only Medium/High risk (>= 0.40) need counterfactuals — matches tier boundary
+    if current_probability < 0.40:
+        return {"status": "Not required. Applicant is low risk (< 40% default probability)."}
 
     print("Initiating Counterfactual Grid Search...")
     
