@@ -1,0 +1,26 @@
+# Virtual environments
+xai-asynch-env/
+venv/
+env/
+
+# Byte-compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Git and local env vars
+.git/
+.env
+
+# Tests and Jupyter Notebooks (Not needed for production)
+tests/
+notebooks/
+
+# 🚨 THE MASSIVE DATA FILES (This will drop your build size instantly) 🚨
+data/
+models/
+
+# 🚨 UNUSED ML ARTIFACTS 🚨
+artifacts/rf_credit_model.joblib
+artifacts/xgboost_credit_model.joblib

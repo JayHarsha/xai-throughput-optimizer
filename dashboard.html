@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XAI Throughput Optimizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f172a;
+      --card:    #1e293b;
+      --deep:    #0f172a;
+      --accent:  #3b82f6;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger:  #ef4444;
+      --text:    #f1f5f9;
+      --muted:   #94a3b8;
+      --border:  #334155;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      min-width: 1200px;
+      padding-bottom: 60px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 22px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      background: linear-gradient(90deg, var(--accent) 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    header .subtitle {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 3px;
+    }
+    /* ── Mode section labels ────────────────────────────────────── */
+    .mode-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+    .mode-label::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 16px;
+      background: var(--accent);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────── */
+    main { max-width: 1440px; margin: 0 auto; padding: 32px 40px; }
+    section { margin-bottom: 36px; }
+
+    /* ── Cards ──────────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 18px;
+    }
+
+    /* ── Form ───────────────────────────────────────────────────── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 5px;
+    }
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      background: var(--deep);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      transition: border-color 0.15s;
+      appearance: none;
+    }
+    .form-group input:focus,
+    .form-group select:focus { outline: none; border-color: var(--accent); }
+    .form-group select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
+    .form-note {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-bottom: 18px;
+    }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 12px; align-items: center; }
+    .btn {
+      padding: 11px 22px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+      letter-spacing: 0.01em;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #2563eb; }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-outline { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-outline:hover:not(:disabled) { border-color: var(--muted); color: var(--text); }
+    .btn-outline:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-link { background: none; border: none; color: var(--muted); font-size: 0.82rem; cursor: pointer; text-decoration: underline; padding: 0; font-family: inherit; }
+    .btn-link:hover { color: var(--text); }
+
+    /* ── Results grid ───────────────────────────────────────────── */
+    .results-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .result-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      min-height: 320px;
+      transition: all 0.25s ease;
+    }
+    .result-card.async-card { border-top: 3px solid var(--success); }
+    .result-card.sync-card  { border-top: 3px solid var(--danger);  }
+
+    .card-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 14px;
+    }
+    .card-label.async { color: var(--success); }
+    .card-label.sync  { color: var(--danger);  }
+
+    .idle-message {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 220px;
+      color: var(--muted);
+      font-size: 0.875rem;
+    }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
+    /* ── Latency display (the BIG number) ──────────────────────── */
+    .latency-display {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1;
+      margin: 14px 0 2px;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      transition: color 0.3s;
+    }
+    .latency-display.live    { color: var(--warning); }
+    .latency-display.success { color: var(--success); }
+    .latency-display.danger  { color: var(--danger);  }
+
+    .latency-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .stage-header {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .waiting-info    { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.85rem; margin-top: 10px; }
+    .waiting-subtext { color: var(--danger); font-size: 0.78rem; margin-top: 6px; font-style: italic; }
+
+    /* Decision badge */
+    .decision-badge {
+      display: inline-block;
+      padding: 5px 15px;
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .badge-approved { background: #14532d; color: #86efac; }
+    .badge-review   { background: #451a03; color: #fde68a; }
+    .badge-high     { background: #450a0a; color: #fca5a5; }
+
+    /* Probability row */
+    .prob-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .prob-value { font-size: 1.4rem; font-weight: 700; }
+    .prob-label { font-size: 0.8rem; color: var(--muted); }
+    .tier-badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 100px;
+      background: var(--border);
+      color: var(--muted);
+    }
+
+    /* Section labels within cards */
+    .sec-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 16px 0 8px;
+    }
+
+    /* SHAP chart */
+    .chart-wrap { position: relative; height: 200px; margin-bottom: 8px; }
+
+    /* Deep analysis pending block */
+    .deep-pending {
+      background: #131f35;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-top: 14px;
+    }
+    .deep-pending-hdr {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--warning);
+    }
+    .bg-elapsed { font-size: 0.8rem; color: var(--muted); margin-top: 5px; font-variant-numeric: tabular-nums; }
+
+    /* Deep analysis complete badge */
+    .deep-done-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #14532d;
+      color: #86efac;
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin: 12px 0 14px;
+    }
+
+    /* Interactions */
+    .interaction-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.78rem;
+    }
+    .interaction-item:last-child { border-bottom: none; }
+    .interaction-pair { color: var(--muted); font-family: 'Courier New', monospace; font-size: 0.72rem; }
+    .impact-chip {
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+    }
+    .impact-pos { background: #450a0a; color: #fca5a5; }
+    .impact-neg { background: #14532d; color: #86efac; }
+
+    /* Recourse cards */
+    .recourse-card {
+      background: var(--deep);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+    }
+    .recourse-card:last-child { margin-bottom: 0; }
+    .rec-row { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 3px; }
+    .rec-key { color: var(--muted); }
+    .rec-val { font-weight: 600; }
+    .rec-note { font-size: 0.7rem; color: var(--muted); font-style: italic; margin-top: 6px; }
+
+    /* Summary */
+    .result-summary {
+      margin-top: 14px;
+      padding: 10px 14px;
+      background: var(--deep);
+      border-radius: 8px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-style: italic;
+      line-height: 1.5;
+    }
+
+    /* Comparison banner */
+    #comparison-banner {
+      display: none;
+      background: linear-gradient(135deg, #1a3254, #1e293b);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 14px 24px;
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 18px;
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Load Simulation ────────────────────────────────────────── */
+    .load-subtitle { font-size: 0.83rem; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+
+    .load-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .load-row-label { font-size: 0.78rem; font-weight: 600; color: var(--muted); width: 130px; flex-shrink: 0; }
+
+    .load-btn {
+      padding: 7px 16px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--deep);
+      color: var(--text);
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .load-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .load-btn.sync-btn:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+    .load-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .load-running {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      color: var(--warning);
+      font-size: 0.83rem;
+      margin-top: 10px;
+    }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; margin-top: 22px; }
+    .load-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    .load-table th {
+      background: var(--deep);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .load-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); }
+    .load-table tr:last-child td { border-bottom: none; }
+    .load-table tbody tr:hover td { background: #263048; }
+    .cell-async { color: var(--success); font-weight: 600; }
+    .cell-sync  { color: var(--danger);  font-weight: 600; }
+    .cell-muted { color: var(--muted); font-size: 0.76rem; }
+    .empty-row td { color: var(--muted); font-style: italic; text-align: center; }
+
+    .chart-load-wrap { height: 280px; margin-top: 24px; }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>XAI Throughput Optimizer</h1>
+    <div class="subtitle">Asynchronous Pipeline for Explainable AI — Demo</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── SECTION 1: FORM ──────────────────────────────────────── -->
+  <div class="mode-label">Mode 1 &mdash; Single User Experience</div>
+  <section>
+    <div class="card">
+      <div class="card-title">Loan Application</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="f_loan_amnt">Loan Amount ($)</label>
+          <input type="number" id="f_loan_amnt" value="27000" min="1000" max="50000" step="100">
+        </div>
+        <div class="form-group">
+          <label for="f_annual_inc">Annual Income ($)</label>
+          <input type="number" id="f_annual_inc" value="62000">
+        </div>
+        <div class="form-group">
+          <label for="f_dti">DTI (%)</label>
+          <input type="number" id="f_dti" value="22.50" step="0.01">
+        </div>
+        <div class="form-group">
+          <label for="f_fico">FICO Score</label>
+          <input type="number" id="f_fico" value="680" min="300" max="850">
+        </div>
+        <div class="form-group">
+          <label for="f_int_rate">Interest Rate (%)</label>
+          <input type="number" id="f_int_rate" value="12.99" step="0.01">
+        </div>
+        <div class="form-group">
+          <label for="f_term">Term</label>
+          <select id="f_term">
+            <option value="36">36 months</option>
+            <option value="60">60 months</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-note">Remaining ~79 fields use representative defaults from the LendingClub dataset</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-async" onclick="submitForm('asynch')">Submit — Async Pipeline</button>
+        <button class="btn btn-outline" id="btn-sync"  onclick="submitForm('synch')">Submit — Sync Baseline</button>
+        <button class="btn-link" onclick="clearResults()">Clear Results</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SECTION 2: RESULTS ───────────────────────────────────── -->
+  <section>
+    <div id="comparison-banner"></div>
+    <div class="results-grid">
+
+      <!-- LEFT: Async Pipeline -->
+      <div class="result-card async-card">
+        <div class="card-label async">&#9889; Async Pipeline</div>
+        <div id="async-content">
+          <div class="idle-message">Submit an application to see results</div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Sync Baseline -->
+      <div class="result-card sync-card">
+        <div class="card-label sync">&#8987; Sync Baseline</div>
+        <div id="sync-content">
+          <div class="idle-message">Submit an application to see results</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── SECTION 3: LOAD SIMULATION ──────────────────────────── -->
+  <div class="mode-label">Mode 2 &mdash; Concurrent Stress Test</div>
+  <section>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+        <div style="font-size:1rem;font-weight:700;">Concurrent Load Simulation</div>
+        <button class="btn-link" onclick="clearLoadData()">Clear Test Data</button>
+      </div>
+      <div class="load-subtitle">
+        Fire multiple simultaneous requests to observe throughput degradation under concurrent load.<br>
+        Run each pipeline separately to avoid CPU contention between sync and async workers.
+      </div>
+
+      <div class="load-row">
+        <span class="load-row-label">Sync Baseline:</span>
+        <button class="load-btn sync-btn" onclick="runLoad('synch', 1)">1 User</button>
+        <button class="load-btn sync-btn" onclick="runLoad('synch', 5)">5 Users</button>
+        <button class="load-btn sync-btn" onclick="runLoad('synch', 10)">10 Users</button>
+        <button class="load-btn sync-btn" onclick="runLoad('synch', 25)">25 Users</button>
+        <button class="load-btn sync-btn" onclick="runLoad('synch', 50)">50 Users</button>
+      </div>
+      <div class="load-row">
+        <span class="load-row-label">Async Pipeline:</span>
+        <button class="load-btn" onclick="runLoad('asynch', 1)">1 User</button>
+        <button class="load-btn" onclick="runLoad('asynch', 5)">5 Users</button>
+        <button class="load-btn" onclick="runLoad('asynch', 10)">10 Users</button>
+        <button class="load-btn" onclick="runLoad('asynch', 25)">25 Users</button>
+        <button class="load-btn" onclick="runLoad('asynch', 50)">50 Users</button>
+      </div>
+
+      <div class="load-running" id="load-running">
+        <span class="spinner" style="border-top-color: var(--warning);"></span>
+        <span id="load-running-text">Running…</span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="load-table">
+          <thead>
+            <tr>
+              <th>Pipeline</th><th>Users</th><th>p50 (ms)</th><th>p95 (ms)</th>
+              <th>Req/Sec</th><th>OK / Total</th><th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="load-tbody">
+            <tr class="empty-row"><td colspan="7">No tests run yet — click a button above to start</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="chart-load-wrap">
+        <canvas id="loadChart"></canvas>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const API_BASE = window.location.origin;
+
+const HIDDEN_DEFAULTS = {
+  "installment": 1213.0, "grade": "C", "sub_grade": "C2",
+  "emp_length": "5 years", "home_ownership": "RENT",
+  "verification_status": "Verified", "purpose": "debt_consolidation",
+  "addr_state": "IL", "delinq_2yrs": 0.0, "fico_range_high": 684.0,
+  "inq_last_6mths": 1.0, "mths_since_last_delinq": 999.0,
+  "mths_since_last_record": 999.0, "open_acc": 10.0, "pub_rec": 0.0,
+  "revol_bal": 12500.0, "revol_util": 65.0, "total_acc": 20.0,
+  "collections_12_mths_ex_med": 0.0, "mths_since_last_major_derog": 999.0,
+  "policy_code": 1.0, "application_type": "Individual",
+  "acc_now_delinq": 0.0, "tot_coll_amt": 0.0, "tot_cur_bal": 45000.0,
+  "open_acc_6m": 1.0, "open_act_il": 2.0, "open_il_12m": 1.0,
+  "open_il_24m": 2.0, "mths_since_rcnt_il": 12.0, "total_bal_il": 12000.0,
+  "il_util": 70.0, "open_rv_12m": 2.0, "open_rv_24m": 3.0,
+  "max_bal_bc": 6000.0, "all_util": 68.0, "total_rev_hi_lim": 28400.0,
+  "inq_fi": 1.0, "total_cu_tl": 1.0, "inq_last_12m": 2.0,
+  "acc_open_past_24mths": 5.0, "avg_cur_bal": 4500.0,
+  "bc_open_to_buy": 4500.0, "bc_util": 55.0,
+  "chargeoff_within_12_mths": 0.0, "delinq_amnt": 0.0,
+  "mo_sin_old_il_acct": 72.0, "mo_sin_old_rev_tl_op": 120.0,
+  "mo_sin_rcnt_rev_tl_op": 6.0, "mo_sin_rcnt_tl": 6.0, "mort_acc": 0.0,
+  "mths_since_recent_bc": 12.0, "mths_since_recent_bc_dlq": 999.0,
+  "mths_since_recent_inq": 6.0, "mths_since_recent_revol_delinq": 999.0,
+  "num_accts_ever_120_pd": 0.0, "num_actv_bc_tl": 3.0,
+  "num_actv_rev_tl": 6.0, "num_bc_sats": 4.0, "num_bc_tl": 7.0,
+  "num_il_tl": 6.0, "num_op_rev_tl": 8.0, "num_rev_accts": 14.0,
+  "num_rev_tl_bal_gt_0": 6.0, "num_sats": 10.0, "num_tl_120dpd_2m": 0.0,
+  "num_tl_30dpd": 0.0, "num_tl_90g_dpd_24m": 0.0,
+  "num_tl_op_past_12m": 3.0, "pct_tl_nvr_dlq": 100.0,
+  "percent_bc_gt_75": 25.0, "pub_rec_bankruptcies": 0.0, "tax_liens": 0.0,
+  "tot_hi_cred_lim": 65000.0, "total_bal_ex_mort": 45000.0,
+  "total_bc_limit": 15000.0, "total_il_high_credit_limit": 20000.0,
+  "macro_unemployment_rate": 2.5, "macro_cpi": 238.5, "macro_fed_funds": 1.0
+};
+
+/* ================================================================
+   STATE
+   ================================================================ */
+let asyncTimer   = null;   // interval for tier-1 elapsed counter
+let asyncBgTimer = null;   // interval for background elapsed counter
+let syncTimer    = null;   // interval for sync blocking counter
+
+let asyncTier1Ms = null;   // server-reported tier-1 latency (for banner)
+let syncTotalMs  = null;   // server-reported sync total latency (for banner)
+
+let asyncShapChart = null; // Chart.js instance for async card
+let syncShapChart  = null; // Chart.js instance for sync card
+let loadSimChart   = null; // Chart.js instance for load simulation
+
+let loadRunning = false;
+
+/* ================================================================
+   HELPERS
+   ================================================================ */
+function getPayload() {
+  return {
+    ...HIDDEN_DEFAULTS,
+    loan_amnt:      parseFloat(document.getElementById('f_loan_amnt').value),
+    annual_inc:     parseFloat(document.getElementById('f_annual_inc').value),
+    dti:            parseFloat(document.getElementById('f_dti').value),
+    fico_range_low: parseFloat(document.getElementById('f_fico').value),
+    int_rate:       parseFloat(document.getElementById('f_int_rate').value),
+    term:           parseFloat(document.getElementById('f_term').value),
+  };
+}
+
+function fmtMs(ms) {
+  return Math.round(ms).toLocaleString() + 'ms';
+}
+
+function stripPrefix(name) {
+  return name.replace(/^(num__|cat__)/, '');
+}
+
+function getProbColor(prob) {
+  if (prob < 0.40) return 'var(--success)';
+  if (prob <= 0.60) return 'var(--warning)';
+  return 'var(--danger)';
+}
+
+function decisionBadge(tier) {
+  if (tier === 'Low')    return '<span class="decision-badge badge-approved">APPROVED</span>';
+  if (tier === 'Medium') return '<span class="decision-badge badge-review">REVIEW REQUIRED</span>';
+  return '<span class="decision-badge badge-high">HIGH RISK — DECLINED</span>';
+}
+
+function probRow(prob, tier) {
+  return `<div class="prob-row">
+    <span class="prob-value" style="color:${getProbColor(prob)};">${(prob*100).toFixed(1)}%</span>
+    <span class="prob-label">default probability</span>
+    <span class="tier-badge">${tier} Risk</span>
+  </div>`;
+}
+
+/* ── SHAP chart ─────────────────────────────────────────────────── */
+function destroyChart(ref) {
+  if (ref) { try { ref.destroy(); } catch(e) {} }
+  return null;
+}
+
+function renderShapChart(canvasId, primaryFactors) {
+  const factors = (primaryFactors && primaryFactors.primary_risk_factors) || [];
+  const labels  = factors.map(f => stripPrefix(f.feature));
+  const values  = factors.map(f => f.impact);
+  const colors  = values.map(v => v > 0 ? '#ef4444' : '#22c55e');
+
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+
+  return new Chart(ctx.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderWidth: 0,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => `SHAP impact: ${ctx.raw > 0 ? '+' : ''}${ctx.raw.toFixed(4)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#334155' },
+          ticks: { color: '#94a3b8', font: { size: 11 } },
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: '#e2e8f0', font: { size: 11 } },
+        }
+      }
+    }
+  });
+}
+
+/* ── Interactions HTML ──────────────────────────────────────────── */
+function renderInteractionsHTML(interactions) {
+  if (!interactions || !interactions.complex_interactions || interactions.complex_interactions.length === 0)
+    return '';
+  const rows = interactions.complex_interactions.map(i => {
+    const cls = i.impact > 0 ? 'impact-pos' : 'impact-neg';
+    return `<div class="interaction-item">
+      <span class="interaction-pair">${i.feature_pair}</span>
+      <span class="impact-chip ${cls}">${i.impact > 0 ? '+' : ''}${i.impact.toFixed(4)}</span>
+    </div>`;
+  }).join('');
+  return `<div class="sec-label">Feature Interactions Detected</div><div>${rows}</div>`;
+}
+
+/* ── Recourse HTML ──────────────────────────────────────────────── */
+function renderRecourseHTML(recourse) {
+  if (!recourse) return '';
+
+  if (recourse.status) {
+    const color = recourse.status.includes('low risk') || recourse.status.includes('Not required')
+      ? 'var(--success)' : 'var(--muted)';
+    return `<div class="sec-label">Actionable Recourse</div>
+      <div style="font-size:0.83rem;color:${color};">${recourse.status}</div>`;
+  }
+
+  if (!recourse.actionable_paths || recourse.actionable_paths.length === 0)
+    return `<div class="sec-label">Actionable Recourse</div>
+      <div style="font-size:0.83rem;color:var(--muted);">No viable counterfactuals found.</div>`;
+
+  const cards = recourse.actionable_paths.map(p => `
+    <div class="recourse-card">
+      <div class="rec-row"><span class="rec-key">Suggested Loan</span><span class="rec-val">$${p.suggested_loan_amount.toLocaleString()}</span></div>
+      <div class="rec-row"><span class="rec-key">Term</span><span class="rec-val">${p.suggested_term} months</span></div>
+      <div class="rec-row"><span class="rec-key">Monthly Installment</span><span class="rec-val">$${p.suggested_installment.toLocaleString()}</span></div>
+      <div class="rec-row"><span class="rec-key">Debt Paydown Required</span><span class="rec-val">$${p.required_debt_paydown.toLocaleString()}</span></div>
+      <div class="rec-row"><span class="rec-key">New Risk Score</span><span class="rec-val" style="color:var(--success);">${(p.new_simulated_risk * 100).toFixed(1)}%</span></div>
+      <div class="rec-note">${p.compliance_note}</div>
+    </div>`).join('');
+
+  return `<div class="sec-label">How to Improve Your Application</div>${cards}`;
+}
+
+/* ── Comparison banner ──────────────────────────────────────────── */
+function checkBanner() {
+  if (asyncTier1Ms !== null && syncTotalMs !== null) {
+    const mult = Math.round(syncTotalMs / asyncTier1Ms);
+    const el = document.getElementById('comparison-banner');
+    el.textContent = `⚡ Async pipeline delivered first result ${mult}x faster than sync baseline`;
+    el.style.display = 'block';
+  }
+}
+
+/* ================================================================
+   ASYNC PIPELINE FLOW
+   ================================================================ */
+function submitAsync() {
+  clearInterval(asyncTimer);
+  clearInterval(asyncBgTimer);
+  asyncShapChart = destroyChart(asyncShapChart);
+  asyncTier1Ms   = null;
+
+  const payload = getPayload();
+  const t0 = Date.now();
+
+  document.getElementById('async-content').innerHTML = `
+    <div class="stage-header">⚡ Tier 1 Response</div>
+    <div class="latency-display live" id="at1-elapsed">0ms</div>
+    <div class="latency-label">elapsed</div>
+    <div class="waiting-info"><span class="spinner"></span>Computing decision + basic explanation…</div>
+  `;
+
+  asyncTimer = setInterval(() => {
+    const el = document.getElementById('at1-elapsed');
+    if (el) el.textContent = fmtMs(Date.now() - t0);
+  }, 100);
+
+  fetch(API_BASE + '/predict/asynch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(30000)
+  })
+  .then(r => r.json())
+  .then(data => {
+    clearInterval(asyncTimer);
+    asyncTier1Ms = data.api_latency_ms;
+    showAsyncTier1(data);
+  })
+  .catch(err => {
+    clearInterval(asyncTimer);
+    document.getElementById('async-content').innerHTML =
+      `<div style="color:var(--danger);padding:20px;font-size:0.9rem;">&#10060; ${err.message}</div>`;
+  });
+}
+
+function showAsyncTier1(data) {
+  const { risk_tier: tier, default_probability: prob,
+          api_latency_ms: t1Ms, immediate_primary_factors: factors,
+          deep_analysis: deep } = data;
+  const taskId = deep && deep.task_id;
+
+  asyncShapChart = destroyChart(asyncShapChart);
+
+  document.getElementById('async-content').innerHTML = `
+    <div class="latency-display success">${fmtMs(t1Ms)}</div>
+    <div class="latency-label">Perceived Latency</div>
+    ${decisionBadge(tier)}
+    ${probRow(prob, tier)}
+    <div class="sec-label">Top SHAP Factors <span style="color:var(--danger);font-weight:400;">&#9632; increases risk</span>&nbsp;&nbsp;<span style="color:var(--success);font-weight:400;">&#9632; reduces risk</span></div>
+    <div class="chart-wrap"><canvas id="asyncShapCanvas"></canvas></div>
+    ${taskId ? `
+    <div class="deep-pending" id="deep-pending">
+      <div class="deep-pending-hdr"><span class="spinner" style="border-top-color:var(--warning);"></span>&#8987; Deep Analysis — Processing in background…</div>
+      <div class="bg-elapsed" id="bg-elapsed">0ms elapsed in background</div>
+    </div>` : `
+    <div class="deep-pending">
+      <div style="color:var(--success);font-size:0.83rem;">&#10003; Deep Analysis not required for Low Risk applicants.</div>
+    </div>`}
+  `;
+
+  asyncShapChart = renderShapChart('asyncShapCanvas', factors);
+
+  if (taskId) {
+    const bgT0 = Date.now();
+    asyncBgTimer = setInterval(() => {
+      const el = document.getElementById('bg-elapsed');
+      if (el) el.textContent = fmtMs(Date.now() - bgT0) + ' elapsed in background';
+    }, 100);
+
+    pollResult(taskId, (result) => {
+      clearInterval(asyncBgTimer);
+      const bgMs = Date.now() - bgT0;
+      showAsyncDeepDone(data, result, t1Ms, bgMs);
+    });
+  } else {
+    checkBanner();
+  }
+}
+
+function showAsyncDeepDone(tier1Data, deepResult, t1Ms, bgMs) {
+  const { risk_tier: tier, default_probability: prob,
+          immediate_primary_factors: factors } = tier1Data;
+  const d = deepResult.data || {};
+
+  asyncShapChart = destroyChart(asyncShapChart);
+
+  document.getElementById('async-content').innerHTML = `
+    <div class="latency-display success">${fmtMs(t1Ms)}</div>
+    <div class="latency-label">Perceived Latency</div>
+    ${decisionBadge(tier)}
+    ${probRow(prob, tier)}
+    <div class="sec-label">Top SHAP Factors <span style="color:var(--danger);font-weight:400;">&#9632; increases risk</span>&nbsp;&nbsp;<span style="color:var(--success);font-weight:400;">&#9632; reduces risk</span></div>
+    <div class="chart-wrap"><canvas id="asyncShapCanvas"></canvas></div>
+    <div class="deep-done-badge">&#10003; Deep Analysis Complete — ${fmtMs(bgMs)} in background</div>
+    ${renderInteractionsHTML(d.complex_interactions)}
+    ${renderRecourseHTML(d.actionable_recourse)}
+    <div class="result-summary">
+      User waited <strong>${fmtMs(t1Ms)}</strong> for initial decision.
+      Deep analysis arrived <strong>${fmtMs(bgMs)}</strong> later — entirely in background.
+    </div>
+  `;
+
+  asyncShapChart = renderShapChart('asyncShapCanvas', factors);
+  checkBanner();
+}
+
+async function pollResult(taskId, onComplete) {
+  const poll = async () => {
+    try {
+      const res  = await fetch(API_BASE + '/result/' + taskId);
+      const data = await res.json();
+      if (data.status === 'Completed') {
+        onComplete(data);
+      } else if (data.status === 'Failed') {
+        clearInterval(asyncBgTimer);
+        const el = document.getElementById('deep-pending');
+        if (el) el.innerHTML = '<div style="color:var(--danger);font-size:0.83rem;">&#10060; Deep analysis failed.</div>';
+      } else {
+        setTimeout(poll, 1000);
+      }
+    } catch (e) {
+      setTimeout(poll, 1000);
+    }
+  };
+  setTimeout(poll, 1000);
+}
+
+/* ================================================================
+   SYNC BASELINE FLOW
+   ================================================================ */
+function submitSync() {
+  clearInterval(syncTimer);
+  syncShapChart = destroyChart(syncShapChart);
+  syncTotalMs   = null;
+
+  const payload = getPayload();
+  const t0 = Date.now();
+
+  document.getElementById('sync-content').innerHTML = `
+    <div class="stage-header">&#8987; Processing — Please Wait</div>
+    <div class="latency-display live" id="sync-elapsed">0ms</div>
+    <div class="latency-label">elapsed</div>
+    <div class="waiting-info">Computing full XAI pipeline synchronously…</div>
+    <div class="waiting-subtext">User is blocked until ALL computation completes</div>
+  `;
+
+  syncTimer = setInterval(() => {
+    const el = document.getElementById('sync-elapsed');
+    if (el) el.textContent = fmtMs(Date.now() - t0);
+  }, 100);
+
+  const ctrl = new AbortController();
+  const tOut = setTimeout(() => ctrl.abort(), 120000);
+
+  fetch(API_BASE + '/predict/synch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal: ctrl.signal
+  })
+  .then(r => r.json())
+  .then(data => {
+    clearTimeout(tOut);
+    clearInterval(syncTimer);
+    syncTotalMs = data.api_latency_ms;
+    showSyncResult(data);
+  })
+  .catch(err => {
+    clearTimeout(tOut);
+    clearInterval(syncTimer);
+    document.getElementById('sync-content').innerHTML =
+      `<div style="color:var(--danger);padding:20px;font-size:0.9rem;">&#10060; ${err.message}</div>`;
+  });
+}
+
+function showSyncResult(data) {
+  const { risk_tier: tier, default_probability: prob,
+          api_latency_ms: latMs, immediate_primary_factors: factors,
+          complex_interactions, actionable_recourse } = data;
+
+  syncShapChart = destroyChart(syncShapChart);
+
+  document.getElementById('sync-content').innerHTML = `
+    <div class="latency-display danger">${fmtMs(latMs)}</div>
+    <div class="latency-label">Blocking Latency</div>
+    ${decisionBadge(tier)}
+    ${probRow(prob, tier)}
+    <div class="sec-label">Top SHAP Factors <span style="color:var(--danger);font-weight:400;">&#9632; increases risk</span>&nbsp;&nbsp;<span style="color:var(--success);font-weight:400;">&#9632; reduces risk</span></div>
+    <div class="chart-wrap"><canvas id="syncShapCanvas"></canvas></div>
+    ${renderInteractionsHTML(complex_interactions)}
+    ${renderRecourseHTML(actionable_recourse)}
+    <div class="result-summary">User waited <strong>${fmtMs(latMs)}</strong> for any result.</div>
+  `;
+
+  syncShapChart = renderShapChart('syncShapCanvas', factors);
+  checkBanner();
+}
+
+/* ================================================================
+   SHARED FORM LOGIC
+   ================================================================ */
+function submitForm(mode) {
+  if (mode === 'asynch') submitAsync();
+  else                   submitSync();
+}
+
+function clearResults() {
+  clearInterval(asyncTimer);
+  clearInterval(asyncBgTimer);
+  clearInterval(syncTimer);
+  asyncShapChart = destroyChart(asyncShapChart);
+  syncShapChart  = destroyChart(syncShapChart);
+  asyncTier1Ms = null;
+  syncTotalMs  = null;
+
+  document.getElementById('async-content').innerHTML =
+    '<div class="idle-message">Submit an application to see results</div>';
+  document.getElementById('sync-content').innerHTML =
+    '<div class="idle-message">Submit an application to see results</div>';
+
+  const banner = document.getElementById('comparison-banner');
+  banner.style.display = 'none';
+  banner.textContent = '';
+}
+
+/* ================================================================
+   LOAD SIMULATION
+   ================================================================ */
+function pctile(arr, p) {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a, b) => a - b);
+  const i = (p / 100) * (s.length - 1);
+  const lo = Math.floor(i), hi = Math.ceil(i);
+  return lo === hi ? s[lo] : s[lo] + (s[hi] - s[lo]) * (i - lo);
+}
+
+function setLoadBtns(disabled) {
+  document.querySelectorAll('.load-btn').forEach(b => (b.disabled = disabled));
+}
+
+async function runLoad(endpoint, n) {
+  if (loadRunning) return;
+  loadRunning = true;
+  setLoadBtns(true);
+
+  const runEl = document.getElementById('load-running');
+  document.getElementById('load-running-text').textContent =
+    `Running ${n} concurrent ${endpoint === 'synch' ? 'sync' : 'async'} requests…`;
+  runEl.style.display = 'flex';
+
+  const payload = getPayload();
+  const url = API_BASE + '/predict/' + endpoint;
+  const timeoutMs = endpoint === 'synch' ? 120000 : 30000;
+
+  const t0wall = Date.now();
+
+  const promises = Array.from({ length: n }, () => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal
+    })
+    .then(r => r.json())
+    .then(d => { clearTimeout(t); return { ok: true,  lat: d.api_latency_ms }; })
+    .catch(e => { clearTimeout(t); return { ok: false, err: e.message       }; });
+  });
+
+  const settled = await Promise.allSettled(promises);
+  const wallSec = (Date.now() - t0wall) / 1000;
+
+  const latencies = [];
+  let okCount = 0;
+  for (const r of settled) {
+    const v = r.value;
+    if (v && v.ok && typeof v.lat === 'number') { latencies.push(v.lat); okCount++; }
+  }
+
+  const p50 = Math.round(pctile(latencies, 50));
+  const p95 = Math.round(pctile(latencies, 95));
+  const rps  = wallSec > 0 ? (okCount / wallSec).toFixed(1) : '0';
+
+  const isSync   = endpoint === 'synch';
+  const label    = `${isSync ? 'Sync' : 'Async'}-${n}u`;
+  const cellCls  = isSync ? 'cell-sync' : 'cell-async';
+  const pipeName = isSync ? 'Sync Baseline' : 'Async Pipeline';
+  const rpsCls   = isSync ? 'cell-sync' : 'cell-async';
+  const note     = isSync
+    ? (n >= 10 ? 'Blocking — high latency expected' : '')
+    : 'Tier 1 latency (user-perceived)';
+
+  const tbody = document.getElementById('load-tbody');
+  const empty = tbody.querySelector('.empty-row');
+  if (empty) empty.remove();
+
+  tbody.insertAdjacentHTML('beforeend', `<tr>
+    <td class="${cellCls}">${pipeName}</td>
+    <td>${n}</td>
+    <td>${p50.toLocaleString()}</td>
+    <td>${p95.toLocaleString()}</td>
+    <td class="${rpsCls}" style="font-weight:700;">${rps}</td>
+    <td>${okCount} / ${n}</td>
+    <td class="cell-muted">${note}</td>
+  </tr>`);
+
+  pushLoadChartData(label, p50, p95);
+
+  runEl.style.display = 'none';
+  loadRunning = false;
+  setLoadBtns(false);
+}
+
+/* ── Clear load test data ───────────────────────────────────────── */
+function clearLoadData() {
+  document.getElementById('load-tbody').innerHTML =
+    '<tr class="empty-row"><td colspan="7">No tests run yet — click a button above to start</td></tr>';
+  if (loadSimChart) {
+    loadSimChart.data.labels = [];
+    loadSimChart.data.datasets.forEach(ds => (ds.data = []));
+    loadSimChart.update();
+  }
+}
+
+/* ── Load simulation Chart.js ───────────────────────────────────── */
+function initLoadChart() {
+  const ctx = document.getElementById('loadChart').getContext('2d');
+  loadSimChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'p50 (ms)',
+          data: [],
+          backgroundColor: '#3b82f6',
+          borderWidth: 0,
+          borderRadius: 4,
+        },
+        {
+          label: 'p95 (ms)',
+          data: [],
+          backgroundColor: '#f59e0b',
+          borderWidth: 0,
+          borderRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 350 },
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: '#94a3b8', font: { size: 12 }, boxWidth: 14 }
+        },
+        title: {
+          display: true,
+          text: 'Response Time Degradation Under Load',
+          color: '#f1f5f9',
+          font: { size: 14, weight: '600' },
+          padding: { bottom: 14 }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#334155' },
+          ticks: { color: '#94a3b8', font: { size: 11 } },
+        },
+        y: {
+          grid: { color: '#334155' },
+          ticks: { color: '#94a3b8', font: { size: 11 } },
+          title: { display: true, text: 'Response Time (ms)', color: '#94a3b8', font: { size: 12 } },
+          beginAtZero: true,
+        }
+      }
+    }
+  });
+}
+
+function pushLoadChartData(label, p50, p95) {
+  if (!loadSimChart) return;
+  loadSimChart.data.labels.push(label);
+  loadSimChart.data.datasets[0].data.push(p50);
+  loadSimChart.data.datasets[1].data.push(p95);
+  loadSimChart.update();
+}
+
+/* ================================================================
+   INIT
+   ================================================================ */
+document.addEventListener('DOMContentLoaded', initLoadChart);
+</script>
+</body>
+</html>
