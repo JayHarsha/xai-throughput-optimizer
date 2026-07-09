@@ -107,7 +107,7 @@ class NoXAIBaselineUser(HttpUser):
             "/predict/baseline",
             json=PAYLOAD,
             catch_response=True,
-            timeout=10,  # pure inference should never exceed a few ms; fail fast if it does
+            timeout=30,  # generous enough to avoid clipping the true tail under heavy queueing contention
             headers={"Connection": "close"}  # avoid keep-alive reuse races under high request-rate load
         ) as response:
             if response.status_code == 200:

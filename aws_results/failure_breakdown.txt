@@ -1,0 +1,26 @@
+====================================================================
+  Failure Reason Breakdown
+  Source: results/failures/*_failures.csv, summed across repeat runs
+  (Not part of the Mann-Whitney hypothesis tests — diagnostic only)
+====================================================================
+
+  No XAI
+  ------------------------------------------------------------
+    10 users  (17 total failures)
+         17  (100.0%)  CatchResponseError('HTTP 0')
+    25 users  (146 total failures)
+        146  (100.0%)  CatchResponseError('HTTP 0')
+    50 users  (427 total failures)
+        427  (100.0%)  CatchResponseError('HTTP 0')
+
+  Synch XAI
+  ------------------------------------------------------------
+    No failures recorded.
+
+  Asynch XAI
+  ------------------------------------------------------------
+    25 users  (43 total failures)
+         43  (100.0%)  CatchResponseError('HTTP 0')
+    50 users  (160 total failures)
+        160  (100.0%)  CatchResponseError('HTTP 0')
+
