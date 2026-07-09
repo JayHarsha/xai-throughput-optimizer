@@ -198,6 +198,61 @@ def write_failure_breakdown(failure_data: dict[str, dict[int, dict[str, int]]]) 
     print(f"Failure breakdown saved  -> {FAILURE_BREAKDOWN_PATH}")
 
 
+# ── Tier-2 completion latency (Async only) ──────────────────────────────────
+# Measures the real end-to-end time until the background SHAP-interactions +
+# counterfactual analysis actually finishes, via locust_asynch.py's "tier2_completion"
+# custom metric — distinct from the fast Tier-1 "/predict/asynch" acknowledgment above.
+def parse_tier2_csv(csv_path: Path) -> dict | None:
+    try:
+        df  = pd.read_csv(csv_path)
+        row = df[(df["Name"] == "tier2_completion") & (df["Type"].str.upper() == "POLL")]
+        if row.empty:
+            return None
+        r     = row.iloc[0]
+        total = int(r["Request Count"])
+        fails = int(r["Failure Count"])
+        return {
+            "p50":           float(r["50%"]),
+            "p95":           float(r["95%"]),
+            "p99":           float(r["99%"]),
+            "avg_ms":        float(r["Average Response Time"]),
+            "request_count": total,
+            "failure_count": fails,
+        }
+    except Exception as e:
+        print(f"  ERROR reading {csv_path.name} for tier2_completion: {e}")
+        return None
+
+
+def collect_tier2_completion() -> dict[int, list[dict]]:
+    """Returns {concurrency_level: [run1_dict, run2_dict, ...]} for Async's Tier-2 metric.
+    Gracefully returns {} if the CSVs predate the polling instrumentation."""
+    result: dict[int, list[dict]] = {}
+    for path in sorted(STATS_DIR.glob("locust_asynch_*_stats.csv")):
+        m = FILENAME_RE.search(path.name)
+        if not m:
+            continue
+        n    = int(m.group(2))
+        data = parse_tier2_csv(path)
+        if data:
+            result.setdefault(n, []).append(data)
+    return result
+
+
+def average_tier2_runs(runs: list[dict]) -> dict:
+    total = sum(r["request_count"] for r in runs)
+    fails = sum(r["failure_count"] for r in runs)
+    return {
+        "p50":           float(np.mean([r["p50"] for r in runs])),
+        "p95":           float(np.mean([r["p95"] for r in runs])),
+        "p99":           float(np.mean([r["p99"] for r in runs])),
+        "avg_ms":        float(np.mean([r["avg_ms"] for r in runs])),
+        "request_count": total,
+        "failure_count": fails,
+        "n_runs":        len(runs),
+    }
+
+
 # ── Statistics helpers ───────────────────────────────────────────────────────
 def rank_biserial(u: float, n1: int, n2: int, alternative: str = "greater") -> float:
     """
@@ -650,6 +705,29 @@ if __name__ == "__main__":
     Synch XAI  : {s50.get('req_s', 0):>6.2f} req/s
     Asynch XAI : {a50.get('req_s', 0):>6.2f} req/s
 """)
+
+    # ── Tier-2 completion latency (Async only) ──────────────────────────────────
+    tier2_raw = collect_tier2_completion()
+    tier2_by_level = {n: average_tier2_runs(runs) for n, runs in tier2_raw.items()}
+
+    section("TIER-2 COMPLETION LATENCY  (Async — time until the deep analysis actually finishes)")
+    if tier2_by_level:
+        print("""
+  The Tier-1 "Asynch XAI" numbers above measure only the fast acknowledgment
+  (task_id returned). This section measures the real end-to-end time until
+  the background SHAP-interactions + counterfactual analysis is retrievable
+  via GET /result/{task_id} — i.e. what the user actually waits for.
+""")
+        print(f"  {'Users':>6}  {'Tier-1 p95 (ms)':>16}  {'Tier-2 p50 (ms)':>16}  {'Tier-2 p95 (ms)':>16}  {'Tier-2 p99 (ms)':>16}  {'Completions':>12}")
+        for n in CONCURRENCY_LEVELS:
+            tier1 = all_data["asynch"].get(n, {})
+            tier2 = tier2_by_level.get(n)
+            if not tier2:
+                continue
+            print(f"  {n:>6}  {tier1.get('p95', 0):>16,.0f}  {tier2['p50']:>16,.0f}  {tier2['p95']:>16,.0f}  {tier2['p99']:>16,.0f}  {tier2['request_count']:>12}")
+        print()
+    else:
+        print("\n  No tier2_completion data found — locust_asynch.py may predate the polling\n  instrumentation, or no Medium/High risk requests occurred.\n")
 
     sys.stdout = sys.__stdout__
     report_file.close()

@@ -1,11 +1,14 @@
+import time
+import gevent
 from locust import HttpUser, task, between
 
 class CreditRiskUser(HttpUser):
     # Simulates a human user waiting 1 to 3 seconds between clicks
-    wait_time = between(1, 3) 
+    wait_time = between(1, 3)
 
     @task
     def submit_loan_application(self):
+        task_id = None
         payload = {
             "loan_amnt": 27000.0,
             "term": 36.0,
@@ -111,3 +114,59 @@ class CreditRiskUser(HttpUser):
                     response.failure("No task_id returned for non-Low risk applicant")
             else:
                 response.failure(f"HTTP {response.status_code}")
+
+        # For Medium/High risk applicants, measure how long Tier-2 (SHAP interactions +
+        # counterfactuals) actually takes to complete under load — not just the fast
+        # Tier-1 acknowledgment above. Runs in its own greenlet so it doesn't block this
+        # user from submitting its next request at the normal wait_time cadence.
+        if task_id:
+            gevent.spawn(self._poll_tier2_completion, task_id)
+
+    def _poll_tier2_completion(self, task_id):
+        start = time.time()
+        max_wait = 120      # give up after 2 minutes and record it as a timed-out poll
+        poll_interval = 1   # seconds between polls
+
+        while True:
+            elapsed_s = time.time() - start
+            if elapsed_s > max_wait:
+                self.environment.events.request.fire(
+                    request_type="POLL",
+                    name="tier2_completion",
+                    response_time=elapsed_s * 1000,
+                    response_length=0,
+                    exception=TimeoutError(f"Tier-2 not completed within {max_wait}s"),
+                )
+                return
+
+            try:
+                r = self.client.get(
+                    f"/result/{task_id}",
+                    name="/result/[task_id]",
+                    timeout=10,
+                )
+                if r.status_code == 200:
+                    status = r.json().get("status")
+                    if status == "Completed":
+                        self.environment.events.request.fire(
+                            request_type="POLL",
+                            name="tier2_completion",
+                            response_time=(time.time() - start) * 1000,
+                            response_length=len(r.content),
+                            exception=None,
+                        )
+                        return
+                    if status == "Failed":
+                        self.environment.events.request.fire(
+                            request_type="POLL",
+                            name="tier2_completion",
+                            response_time=(time.time() - start) * 1000,
+                            response_length=0,
+                            exception=RuntimeError("Celery task reported Failed"),
+                        )
+                        return
+                    # otherwise still "Processing..." — keep polling
+            except Exception:
+                pass  # transient poll error; just retry on the next loop
+
+            gevent.sleep(poll_interval)

@@ -139,3 +139,11 @@ Architecture  Concurrent Users  p50 (ms)  p95 (ms)  p99 (ms)  Throughput (req/s)
     Synch XAI  :   0.06 req/s
     Asynch XAI :   3.59 req/s
 
+
+====================================================================
+  TIER-2 COMPLETION LATENCY  (Async — time until the deep analysis actually finishes)
+====================================================================
+
+  No tier2_completion data found — locust_asynch.py may predate the polling
+  instrumentation, or no Medium/High risk requests occurred.
+
