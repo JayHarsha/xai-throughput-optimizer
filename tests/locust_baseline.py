@@ -96,8 +96,8 @@ class NoXAIBaselineUser(HttpUser):
     Run this to establish the XAI-free latency floor for dissertation benchmarking.
 
     Usage:
-        locust -f tests/locustfile_no_xai.py --host=http://localhost:8000 \
-               --users 50 --spawn-rate 5 --run-time 60s --csv=results/baseline_noxai_50u
+        locust -f tests/locust_baseline.py --host=http://localhost:8000 \
+               --users 50 --spawn-rate 5 --run-time 60s --csv=results/locust_baseline_50u_run1
     """
     wait_time = between(1, 3)
 
@@ -107,7 +107,8 @@ class NoXAIBaselineUser(HttpUser):
             "/predict/baseline",
             json=PAYLOAD,
             catch_response=True,
-            timeout=10  # pure inference should never exceed a few ms; fail fast if it does
+            timeout=10,  # pure inference should never exceed a few ms; fail fast if it does
+            headers={"Connection": "close"}  # avoid keep-alive reuse races under high request-rate load
         ) as response:
             if response.status_code == 200:
                 data = response.json()

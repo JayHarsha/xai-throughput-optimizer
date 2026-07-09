@@ -14,3 +14,4 @@ pycache/
 .pytest_cache/
 artifacts/*.joblib
 !artifacts/lightgbm_credit_model.joblib
+!artifacts/realtime_preprocessor.joblib

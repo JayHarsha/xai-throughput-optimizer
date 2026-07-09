@@ -68,7 +68,7 @@ async def predict_risk_sync(payload: dict):
         "complex_interactions": complex_interactions,
         "actionable_recourse": actionable_recourse,
         "api_latency_ms": round(latency_ms, 2),
-        "mode": "synchronous_baseline"
+        "mode": "synchronous_xai"
     }
 
 @app.post("/predict/asynch")
@@ -143,11 +143,12 @@ async def get_result(task_id: str):
 async def live_metrics():
     def calc(times):
         if not times:
-            return {"p50_ms": 0, "p95_ms": 0, "request_count": 0}
+            return {"p50_ms": 0, "p95_ms": 0, "p99_ms": 0, "request_count": 0}
         arr = list(times)
         return {
             "p50_ms": round(float(np.percentile(arr, 50)), 2),
             "p95_ms": round(float(np.percentile(arr, 95)), 2),
+            "p99_ms": round(float(np.percentile(arr, 99)), 2),
             "request_count": len(arr)
         }
     return {

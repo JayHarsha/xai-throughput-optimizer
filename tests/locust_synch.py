@@ -98,7 +98,8 @@ class SyncBaselineUser(HttpUser):
             "/predict/synch",
             json=PAYLOAD,
             catch_response=True,
-            timeout=120  # high timeout because sync will be SLOW under load
+            timeout=120,  # high timeout because sync will be SLOW under load
+            headers={"Connection": "close"}  # avoid keep-alive reuse races under high request-rate load
         ) as response:
             if response.status_code == 200:
                 data = response.json()

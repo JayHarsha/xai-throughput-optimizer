@@ -95,14 +95,19 @@ class CreditRiskUser(HttpUser):
             "macro_fed_funds": 1.0        
         }
 
-        # This hits your Fast API gateway
-        with self.client.post("/predict/asynch", json=payload, catch_response=True) as response:
+        with self.client.post(
+            "/predict/asynch", json=payload,
+            catch_response=True, timeout=30,
+            headers={"Connection": "close"}  # avoid keep-alive reuse races under high request-rate load
+        ) as response:
             if response.status_code == 200:
                 data = response.json()
-                # Validate that it actually triggered the background worker
-                if data.get("deep_analysis", {}).get("task_id"):
+                tier = data.get("risk_tier", "")
+                task_id = data.get("deep_analysis", {}).get("task_id")
+                # Low risk legitimately skips Celery — not a failure
+                if tier == "Low" or task_id:
                     response.success()
                 else:
-                    response.failure("Failed to trigger Celery. Was the risk tier Low?")
+                    response.failure("No task_id returned for non-Low risk applicant")
             else:
-                response.failure(f"HTTP Error {response.status_code}")
+                response.failure(f"HTTP {response.status_code}")
