@@ -139,6 +139,32 @@ async def get_result(task_id: str):
     else:
         return {"task_id": task_id, "status": task_result.state}
 
+@app.get("/queue/depth")
+def queue_depth():
+    """
+    Celery backlog check. scripts/benchmark_pipelines.ps1 polls this between
+    runs and waits until the Tier-2 queue is fully drained, so one run's
+    backlog cannot contaminate the next run's latency measurements.
+    Sync (not async) on purpose: FastAPI runs it in a threadpool, so the
+    blocking broker inspection cannot stall the event loop.
+    """
+    queued, active = -1, -1
+    try:
+        with celery_app.connection_or_acquire() as conn:
+            queued = conn.default_channel.client.llen("celery")
+    except Exception:
+        pass
+    try:
+        active_map = celery_app.control.inspect(timeout=1.0).active() or {}
+        active = sum(len(tasks) for tasks in active_map.values())
+    except Exception:
+        pass
+    return {
+        "queued": queued,
+        "active": active,
+        "drained": queued == 0 and active == 0,
+    }
+
 @app.get("/metrics/live")
 async def live_metrics():
     def calc(times):

@@ -12,6 +12,27 @@ $RUN_TIME       = "60s"
 $SPAWN_RATE     = 5
 $RECOVERY_SLEEP = 15
 $REPEATS        = 3
+$DRAIN_TIMEOUT  = 420   # max seconds to wait for the Celery Tier-2 queue to empty between runs
+
+# Waits until the server reports an empty Celery queue (no queued + no active
+# Tier-2 tasks). Without this, asynch runs leave a backlog of CPU-heavy SHAP
+# tasks that starves the API during the NEXT run and corrupts its latencies.
+function Wait-QueueDrain {
+    param([string]$BaseUrl)
+    $deadline = (Get-Date).AddSeconds($DRAIN_TIMEOUT)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $q = Invoke-RestMethod -Uri "$BaseUrl/queue/depth" -TimeoutSec 15
+            if ($q.drained) { return $true }
+            Write-Host "    Celery queue: $($q.queued) queued, $($q.active) active - draining..."
+        } catch {
+            Write-Host "    /queue/depth unreachable (server busy) - retrying..."
+        }
+        Start-Sleep -Seconds 5
+    }
+    Write-Host "  WARNING: queue did not drain within ${DRAIN_TIMEOUT}s - next run may be contaminated"
+    return $false
+}
 
 New-Item -ItemType Directory -Force $RESULTS        | Out-Null
 New-Item -ItemType Directory -Force $STATS_DIR      | Out-Null
@@ -78,6 +99,8 @@ for ($i = 0; $i -lt $ARCHS.Count; $i++) {
             }
 
             if ($run_count -lt $total) {
+                Write-Host "  Waiting for Celery Tier-2 queue to drain..."
+                Wait-QueueDrain $TargetHost | Out-Null
                 Write-Host "  Sleeping ${RECOVERY_SLEEP}s..."
                 Start-Sleep -Seconds $RECOVERY_SLEEP
             }

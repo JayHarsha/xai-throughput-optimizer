@@ -125,7 +125,10 @@ class CreditRiskUser(HttpUser):
     def _poll_tier2_completion(self, task_id):
         start = time.time()
         max_wait = 120      # give up after 2 minutes and record it as a timed-out poll
-        poll_interval = 1   # seconds between polls
+        poll_interval = 3   # seconds between polls — at 1s the poll GETs reached ~40-50 req/s
+                            # and starved the 2-vCPU benchmark host, corrupting Tier-1 latencies
+
+        gevent.sleep(2)     # Tier-2 takes >2s even unloaded; skip the guaranteed-pending first poll
 
         while True:
             elapsed_s = time.time() - start

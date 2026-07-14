@@ -15,3 +15,10 @@ pycache/
 artifacts/*.joblib
 !artifacts/lightgbm_credit_model.joblib
 !artifacts/realtime_preprocessor.joblib
+
+# Local-only archive of past benchmark result generations (see BENCHMARK_CHANGELOG.md)
+previous_aws_results/
+
+24245411_CA2_Practicum.docx
+BENCHMARK_CHANGELOG.md
+

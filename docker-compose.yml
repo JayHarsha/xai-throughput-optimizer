@@ -39,3 +39,9 @@ services:
         condition: service_healthy
     deploy:
       replicas: 3
+      # Cap each Tier-2 worker to half a core so background SHAP/counterfactual
+      # churn can never starve the API of CPU on the 2-vCPU benchmark host.
+      # Deliberate architectural choice: the interactive tier gets priority.
+      resources:
+        limits:
+          cpus: "0.50"
