@@ -8,21 +8,21 @@
   FULL RESULTS TABLE
 ====================================================================
 Architecture  Concurrent Users  p50 (ms)  p95 (ms)  p99 (ms)  Throughput (req/s)  Failure Rate (%)  Request Count  Repeats
-      No XAI                 1        25        44        47                0.50               0.0             87        3
-      No XAI                 5        23        49        91                2.51               0.0            440        3
-      No XAI                10        27      7032      7050                3.97               1.4            702        3
-      No XAI                25        32     17666     21000                4.80               6.4            846        3
-      No XAI                50        47     21000     21000                5.63              15.5            997        3
-   Synch XAI                 1       620       653       666                0.40               0.0             71        3
-   Synch XAI                 5      2233      3400      4566                1.21               0.0            211        3
-   Synch XAI                10      5066     12333     14666                1.18               0.0            205        3
-   Synch XAI                25     13333     33666     41000                1.12               0.0            194        3
-   Synch XAI                50     24666     47333     52333                0.92               0.0            160        3
-  Asynch XAI                 1        34       634      2211                0.46               0.0             80        3
-  Asynch XAI                 5     10059     10203     10390                1.46               2.0            249        3
-  Asynch XAI                10       155     15700     18966                2.20               7.5            387        3
-  Asynch XAI                25       310     21000     21000                3.44              15.1            609        3
-  Asynch XAI                50       690     24000     29333                4.20              27.6            742        3
+      No XAI                 1        26        74       109                0.49               0.0             84        3
+      No XAI                 5        24        41        59                2.50               0.0            436        3
+      No XAI                10        23        37        59                5.03               0.0            896        3
+      No XAI                25        23      2392      5036               10.71               0.1           1908        3
+      No XAI                50        31      7029      7043               12.19               4.6           2057        3
+   Synch XAI                 1       633       656       666                0.38               0.0             66        3
+   Synch XAI                 5      2233      3366      4166                1.22               0.0            212        3
+   Synch XAI                10      5300     12333     14666                1.14               0.0            200        3
+   Synch XAI                25     13666     37333     45000                1.11               0.0            197        3
+   Synch XAI                50     17333     44000     52333                1.09               0.0            194        3
+  Asynch XAI                 1        26        49        56                0.49               0.0             85        3
+  Asynch XAI                 5        55       103       173                2.44               0.0            436        3
+  Asynch XAI                10        58       156     10173                4.12               0.4            734        3
+  Asynch XAI                25       340     14250     24000                5.11               6.3            906        3
+  Asynch XAI                50      1546     10566     14500                8.03               6.7           1424        3
 
   Saved to: summary_table.csv
 
@@ -32,25 +32,25 @@ Architecture  Concurrent Users  p50 (ms)  p95 (ms)  p99 (ms)  Throughput (req/s)
   (Each architecture has 15 observations: 5 concurrency levels x repeat runs)
 
   No XAI  (15 runs)
-    Min            :       35 ms
-    Median         :       58 ms
-    Mean           :    9,159 ms
-    Std Dev        :    9,869 ms
+    Min            :       34 ms
+    Median         :       43 ms
+    Mean           :    1,915 ms
+    Std Dev        :    5,394 ms
     Max            :   21,000 ms
 
   Synch XAI  (15 runs)
-    Min            :      650 ms
-    Median         :   12,000 ms
-    Mean           :   19,477 ms
-    Std Dev        :   18,304 ms
-    Max            :   53,000 ms
+    Min            :      640 ms
+    Median         :   13,000 ms
+    Mean           :   19,538 ms
+    Std Dev        :   17,890 ms
+    Max            :   48,000 ms
 
   Asynch XAI  (15 runs)
     Min            :       39 ms
-    Median         :   21,000 ms
-    Mean           :   14,308 ms
-    Std Dev        :   11,093 ms
-    Max            :   30,000 ms
+    Median         :      160 ms
+    Mean           :    5,025 ms
+    Std Dev        :    8,175 ms
+    Max            :   21,000 ms
 
 
 ====================================================================
@@ -71,31 +71,31 @@ Architecture  Concurrent Users  p50 (ms)  p95 (ms)  p99 (ms)  Throughput (req/s)
   Step 1  (Establish the problem): Synchronous XAI inflates tail latency beyond the no-XAI baseline
   Research question : Is the latency problem caused by XAI, or by the API infrastructure?
   Test              : Mann-Whitney U [greater],  Synch XAI  vs  No XAI
-  U statistic       : 162.0
-  p-value           : 0.0208   (< 0.05 — significant)
-  Effect size       : r = 0.44  (medium effect)
-  Median Synch XAI         :   12,000 ms
-  Median No XAI            :       58 ms
+  U statistic       : 210.0
+  p-value           : 0.0000   (< 0.05 — significant)
+  Effect size       : r = 0.867  (large effect)
+  Median Synch XAI         :   13,000 ms
+  Median No XAI            :       43 ms
   Verdict           : SUPPORTED  ✓
 
   Step 2  (Validate the solution): Async pipeline significantly reduces tail latency vs synchronous XAI
   Research question : Does moving XAI off the request path actually fix the problem?
   Test              : Mann-Whitney U [greater],  Synch XAI  vs  Asynch XAI
-  U statistic       : 135.0
-  p-value           : 0.1792   (> 0.05 — not significant)
-  Effect size       : r = 0.2  (small effect)
-  Median Synch XAI         :   12,000 ms
-  Median Asynch XAI        :   21,000 ms
-  Verdict           : NOT SUPPORTED  ✗
+  U statistic       : 183.0
+  p-value           : 0.0018   (< 0.05 — significant)
+  Effect size       : r = 0.627  (large effect)
+  Median Synch XAI         :   13,000 ms
+  Median Asynch XAI        :      160 ms
+  Verdict           : SUPPORTED  ✓
 
   Step 3  (Test the ideal outcome): Async Tier-1 perceived latency is statistically equivalent to no-XAI baseline
   Research question : Is async so fast that XAI is effectively free from the user's perspective?
   Test              : Mann-Whitney U [two-sided],  Asynch XAI  vs  No XAI
-  U statistic       : 159.5
-  p-value           : 0.0462   (< 0.05 — significant)
-  Effect size       : r = 0.418  (medium effect)
-  Median Asynch XAI        :   21,000 ms
-  Median No XAI            :       58 ms
+  U statistic       : 184.5
+  p-value           : 0.0030   (< 0.05 — significant)
+  Effect size       : r = 0.64  (large effect)
+  Median Asynch XAI        :      160 ms
+  Median No XAI            :       43 ms
   Verdict           : NOT SUPPORTED  (p < 0.05, distributions differ)
 
 ====================================================================
@@ -104,20 +104,20 @@ Architecture  Concurrent Users  p50 (ms)  p95 (ms)  p99 (ms)  Throughput (req/s)
 
   Step 1 — Problem established:
   CONFIRMED
-  Synch XAI adds 207x median
+  Synch XAI adds 302x median
   latency overhead vs No XAI. The bottleneck is XAI computation,
-  not API infrastructure. p = 0.0208, r = 0.44 (medium effect).
+  not API infrastructure. p = 0.0000, r = 0.867 (large effect).
 
   Step 2 — Solution validated:
-  NOT CONFIRMED
-  Asynch XAI reduces median p95 from 12,000 ms (Synch XAI) to
-  21,000 ms — a -75% reduction.
+  CONFIRMED
+  Asynch XAI reduces median p95 from 13,000 ms (Synch XAI) to
+  160 ms — a 99% reduction.
   Asynchronous decoupling via Redis/Celery is a statistically validated
-  architectural fix. p = 0.1792, r = 0.2 (small effect).
+  architectural fix. p = 0.0018, r = 0.627 (large effect).
 
   Step 3 — Ideal outcome:
   NOT ACHIEVED (scope limitation)
-  Tier-1 SHAP runs synchronously before returning, adding measurable overhead under high concurrency (25+ users). Asynch XAI reduces tail latency by ~-75% vs Synch XAI (Step 2 confirmed) but does not fully reach the No XAI floor. p = 0.0462. Future work: precompute or cache Tier-1 explanations to close this gap.
+  Tier-1 SHAP runs synchronously before returning, adding measurable overhead under high concurrency (25+ users). Asynch XAI reduces tail latency by ~99% vs Synch XAI (Step 2 confirmed) but does not fully reach the No XAI floor. p = 0.0030. Future work: precompute or cache Tier-1 explanations to close this gap.
 
 
 ====================================================================
@@ -125,19 +125,19 @@ Architecture  Concurrent Users  p50 (ms)  p95 (ms)  p99 (ms)  Throughput (req/s)
 ====================================================================
 
   Tail latency (p95):
-    No XAI     :   21,000 ms
-    Synch XAI  :   47,333 ms  (2x slower than No XAI)
-    Asynch XAI :   24,000 ms  (49% faster than Synch XAI)
+    No XAI     :    7,029 ms
+    Synch XAI  :   44,000 ms  (6x slower than No XAI)
+    Asynch XAI :   10,567 ms  (76% faster than Synch XAI)
 
   Failure rate:
-    No XAI     :   15.5%
+    No XAI     :    4.6%
     Synch XAI  :    0.0%   (system effectively broken under load)
-    Asynch XAI :   27.6%
+    Asynch XAI :    6.7%
 
   Throughput (req/s):
-    No XAI     :   5.63 req/s
-    Synch XAI  :   0.92 req/s
-    Asynch XAI :   4.20 req/s
+    No XAI     :  12.19 req/s
+    Synch XAI  :   1.09 req/s
+    Asynch XAI :   8.03 req/s
 
 
 ====================================================================
@@ -150,7 +150,9 @@ Architecture  Concurrent Users  p50 (ms)  p95 (ms)  p99 (ms)  Throughput (req/s)
   via GET /result/{task_id} — i.e. what the user actually waits for.
 
    Users   Tier-1 p95 (ms)   Tier-2 p50 (ms)   Tier-2 p95 (ms)   Tier-2 p99 (ms)   Completions
-       1               634             1,367             5,067             5,267            79
-       5            10,203            31,000            37,500            38,000            68
-      10            15,700            31,000            45,000            45,000            29
+       1                49             2,000             2,000             2,367            82
+       5               103             8,100            12,000            12,000           345
+      10               157            19,000            31,000            33,333           304
+      25            14,250            15,667            39,333            42,000           168
+      50            10,567            21,333            43,333            47,000           206
 

@@ -125,8 +125,8 @@ class CreditRiskUser(HttpUser):
     def _poll_tier2_completion(self, task_id):
         start = time.time()
         max_wait = 120      # give up after 2 minutes and record it as a timed-out poll
-        poll_interval = 3   # seconds between polls — at 1s the poll GETs reached ~40-50 req/s
-                            # and starved the 2-vCPU benchmark host, corrupting Tier-1 latencies
+        poll_interval = 2   # first retry gap; backs off 1.5x per poll (capped at 10s) so
+                            # poll traffic stays light even when Tier-2 queues up under load
 
         gevent.sleep(2)     # Tier-2 takes >2s even unloaded; skip the guaranteed-pending first poll
 
@@ -143,33 +143,40 @@ class CreditRiskUser(HttpUser):
                 return
 
             try:
-                r = self.client.get(
+                # catch_response + unconditional success(): the polls are measurement
+                # instrumentation, not user traffic — a transient poll error just means
+                # "retry", so it must never be counted as an architecture failure.
+                # Only the synthetic POLL tier2_completion event above carries pass/fail.
+                with self.client.get(
                     f"/result/{task_id}",
                     name="/result/[task_id]",
                     timeout=10,
-                )
-                if r.status_code == 200:
-                    status = r.json().get("status")
-                    if status == "Completed":
-                        self.environment.events.request.fire(
-                            request_type="POLL",
-                            name="tier2_completion",
-                            response_time=(time.time() - start) * 1000,
-                            response_length=len(r.content),
-                            exception=None,
-                        )
-                        return
-                    if status == "Failed":
-                        self.environment.events.request.fire(
-                            request_type="POLL",
-                            name="tier2_completion",
-                            response_time=(time.time() - start) * 1000,
-                            response_length=0,
-                            exception=RuntimeError("Celery task reported Failed"),
-                        )
-                        return
-                    # otherwise still "Processing..." — keep polling
+                    catch_response=True,
+                ) as r:
+                    r.success()
+                    if r.status_code == 200:
+                        status = r.json().get("status")
+                        if status == "Completed":
+                            self.environment.events.request.fire(
+                                request_type="POLL",
+                                name="tier2_completion",
+                                response_time=(time.time() - start) * 1000,
+                                response_length=len(r.content),
+                                exception=None,
+                            )
+                            return
+                        if status == "Failed":
+                            self.environment.events.request.fire(
+                                request_type="POLL",
+                                name="tier2_completion",
+                                response_time=(time.time() - start) * 1000,
+                                response_length=0,
+                                exception=RuntimeError("Celery task reported Failed"),
+                            )
+                            return
+                        # otherwise still "Processing..." — keep polling
             except Exception:
                 pass  # transient poll error; just retry on the next loop
 
             gevent.sleep(poll_interval)
+            poll_interval = min(poll_interval * 1.5, 10)

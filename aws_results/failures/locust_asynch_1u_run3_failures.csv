@@ -1,4 +1,1 @@
 Method,Name,Error,Occurrences
-GET,/result/[task_id],"ConnectTimeoutError(<HTTPConnection(host='54.247.22.67', port=8000) at 0x21423172bd0>, 'Connection to 54.247.22.67 timed out. (connect timeout=10)')",1
-GET,/result/[task_id],"ConnectTimeoutError(<HTTPConnection(host='54.247.22.67', port=8000) at 0x21423126350>, 'Connection to 54.247.22.67 timed out. (connect timeout=10)')",1
-GET,/result/[task_id],"ConnectTimeoutError(<HTTPConnection(host='54.247.22.67', port=8000) at 0x2142318a090>, 'Connection to 54.247.22.67 timed out. (connect timeout=10)')",1

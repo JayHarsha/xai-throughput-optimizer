@@ -21,6 +21,12 @@ services:
       # Use the docker service name 'redis' instead of 'localhost'
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      # 1 OpenMP/BLAS thread per process: 4 API + 3 worker processes on a
+      # 2-vCPU host each defaulting to "all cores" causes thread thrashing
+      # that manifests as connect timeouts under 25-50u load
+      - OMP_NUM_THREADS=1
+      - OPENBLAS_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
     depends_on:
       redis:
         condition: service_healthy
@@ -34,6 +40,9 @@ services:
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - OMP_NUM_THREADS=1
+      - OPENBLAS_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
     depends_on:
       redis:
         condition: service_healthy

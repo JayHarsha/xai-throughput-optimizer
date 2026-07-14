@@ -139,30 +139,37 @@ async def get_result(task_id: str):
     else:
         return {"task_id": task_id, "status": task_result.state}
 
+_queue_redis = None
+
 @app.get("/queue/depth")
 def queue_depth():
     """
     Celery backlog check. scripts/benchmark_pipelines.ps1 polls this between
     runs and waits until the Tier-2 queue is fully drained, so one run's
     backlog cannot contaminate the next run's latency measurements.
+    Talks to Redis directly — the earlier kombu-channel/celery-inspect version
+    returned unreliable values under load. 'queued' = tasks waiting in the
+    broker list, 'reserved' = tasks prefetched by workers but not yet acked.
     Sync (not async) on purpose: FastAPI runs it in a threadpool, so the
-    blocking broker inspection cannot stall the event loop.
+    blocking Redis calls cannot stall the event loop.
     """
-    queued, active = -1, -1
+    global _queue_redis
+    import redis as _redis
+    queued, reserved = -1, -1
     try:
-        with celery_app.connection_or_acquire() as conn:
-            queued = conn.default_channel.client.llen("celery")
+        if _queue_redis is None:
+            _queue_redis = _redis.Redis.from_url(
+                os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0"),
+                socket_timeout=2, socket_connect_timeout=2,
+            )
+        queued = int(_queue_redis.llen("celery"))
+        reserved = int(_queue_redis.hlen("unacked"))
     except Exception:
-        pass
-    try:
-        active_map = celery_app.control.inspect(timeout=1.0).active() or {}
-        active = sum(len(tasks) for tasks in active_map.values())
-    except Exception:
-        pass
+        _queue_redis = None  # force a fresh connection on the next poll
     return {
         "queued": queued,
-        "active": active,
-        "drained": queued == 0 and active == 0,
+        "reserved": reserved,
+        "drained": queued == 0 and reserved == 0,
     }
 
 @app.get("/metrics/live")
