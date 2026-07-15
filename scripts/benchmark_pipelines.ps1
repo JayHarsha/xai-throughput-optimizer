@@ -11,7 +11,9 @@ $EXCEPTIONS_DIR = "$RESULTS/exceptions"
 $RUN_TIME       = "60s"
 $SPAWN_RATE     = 5
 $RECOVERY_SLEEP = 15
-$REPEATS        = 3
+$REPEATS        = 5   # 5 repeats: with n=5 vs 5 the exact one-sided MW can reach
+                      # p = 0.004, so per-level tests survive Holm correction
+                      # (3 repeats cap at p = 0.05 — descriptive only)
 $DRAIN_TIMEOUT  = 300   # max seconds to wait for the Celery Tier-2 queue to empty between runs
 
 # Waits until the server reports an empty Celery queue (no queued + no

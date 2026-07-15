@@ -1,2 +1,2 @@
 Method,Name,Error,Occurrences
-POST,/predict/baseline,CatchResponseError('HTTP 0'),95
+POST,/predict/baseline,CatchResponseError('HTTP 0'),65

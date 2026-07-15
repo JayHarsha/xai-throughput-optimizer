@@ -1,3 +1,1 @@
 Method,Name,Error,Occurrences
-POST,/predict/asynch,CatchResponseError('HTTP 0'),2
-GET,/result/[task_id],"ReadTimeout(ReadTimeoutError(""HTTPConnectionPool(host='46.51.140.46', port=8000): Read timed out. (read timeout=10)""))",63

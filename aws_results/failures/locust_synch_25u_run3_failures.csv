@@ -1,1 +1,2 @@
 Method,Name,Error,Occurrences
+POST,/predict/synch,CatchResponseError('HTTP 0'),8

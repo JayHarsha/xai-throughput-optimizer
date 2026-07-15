@@ -33,6 +33,7 @@ Outputs:      results/mann_whitney_report.txt
               results/plots/  (7 figures)
 """
 
+import math
 import re
 import sys
 import numpy as np
@@ -306,9 +307,13 @@ def run_mw(
     n1, n2   = len(a), len(b)
     r        = rank_biserial(stat, n1, n2, alternative)
     sig      = p < 0.05
-    # For H3: "supported" means NOT significant (we want p > 0.05)
+    # NOTE: a non-significant two-sided test is NOT evidence of equivalence
+    # (absence of evidence fallacy) — the formal equivalence claim is made by
+    # the TOST procedure printed directly below this test.
     if alternative == "two-sided":
-        verdict = "SUPPORTED  (p > 0.05, equivalence holds)" if not sig else "NOT SUPPORTED  (p < 0.05, distributions differ)"
+        verdict = ("NO significant difference detected  (descriptive only — see TOST below for the formal equivalence test)"
+                   if not sig else
+                   "Distributions differ  (p < 0.05 — see TOST below for the bounded-equivalence margin)")
     else:
         verdict = "SUPPORTED  ✓" if sig else "NOT SUPPORTED  ✗"
 
@@ -323,6 +328,123 @@ def run_mw(
     print(f"  Verdict           : {verdict}")
 
     return {"stat": stat, "p": p, "r": r, "sig": sig, "alternative": alternative}
+
+
+# ── Equivalence testing (TOST) ───────────────────────────────────────────────
+TOST_MARGINS = [1.1, 1.25, 1.5, 2.0, 3.0]   # multiplicative margins θ
+TOST_PRIMARY_MARGIN = 1.5                    # pre-registered headline margin
+
+def run_tost(a: list[float], b: list[float], theta: float) -> dict:
+    """
+    Two One-Sided Tests for equivalence on log-latencies with a multiplicative
+    margin θ: H0 is 'a differs from b by more than a factor of θ'. Equivalence
+    is claimed only if BOTH one-sided Mann-Whitney tests reject at α = 0.05,
+    i.e. p_tost = max(p_upper, p_lower) < 0.05. This is the statistically
+    correct way to claim 'async ≈ baseline' — a non-significant two-sided
+    p-value alone would be the absence-of-evidence fallacy.
+    """
+    la = np.log(np.maximum(np.asarray(a, dtype=float), 0.1))
+    lb = np.log(np.maximum(np.asarray(b, dtype=float), 0.1))
+    lt = np.log(theta)
+    # a is within θx above b:  reject H0 that (a / θ) >= b
+    _, p_upper = mannwhitneyu(la - lt, lb, alternative="less")
+    # a is within θx below b:  reject H0 that (a * θ) <= b
+    _, p_lower = mannwhitneyu(la + lt, lb, alternative="greater")
+    p_tost = max(p_upper, p_lower)
+    return {"theta": theta, "p_upper": p_upper, "p_lower": p_lower,
+            "p": p_tost, "equivalent": p_tost < 0.05}
+
+
+def run_tost_sweep(step: str, name_a: str, a: list[float],
+                   name_b: str, b: list[float]) -> dict:
+    """Runs TOST across TOST_MARGINS, prints the sweep, returns the primary-margin
+    result plus θ* (the smallest margin at which equivalence holds, if any)."""
+    print(f"\n  {step}: TOST equivalence test  —  {name_a} vs {name_b}")
+    print(f"  Margins are multiplicative: θ = 1.5 means 'within 1.5x of each other'")
+    print(f"  {'θ':>6}  {'p_upper':>9}  {'p_lower':>9}  {'p_TOST':>9}  verdict")
+    results, theta_star = [], None
+    for theta in TOST_MARGINS:
+        res = run_tost(a, b, theta)
+        results.append(res)
+        if res["equivalent"] and theta_star is None:
+            theta_star = theta
+        print(f"  {theta:>5.2f}x  {res['p_upper']:>9.4f}  {res['p_lower']:>9.4f}  "
+              f"{res['p']:>9.4f}  {'EQUIVALENT within this margin' if res['equivalent'] else 'not shown equivalent'}")
+    primary = next(r for r in results if r["theta"] == TOST_PRIMARY_MARGIN)
+    if theta_star is not None:
+        print(f"  θ* (smallest margin with demonstrated equivalence): {theta_star}x")
+    else:
+        print(f"  θ*: equivalence not demonstrated at any tested margin (max {TOST_MARGINS[-1]}x)")
+    print(f"  Primary verdict (pre-registered θ = {TOST_PRIMARY_MARGIN}x): "
+          f"{'EQUIVALENT' if primary['equivalent'] else 'NOT demonstrated equivalent'}  (p = {primary['p']:.4f})")
+    return {"primary": primary, "theta_star": theta_star, "sweep": results}
+
+
+# ── Per-concurrency-level tests with Holm-Bonferroni correction ──────────────
+def holm_correction(pvals: list[float]) -> list[float]:
+    """Holm step-down adjusted p-values (controls family-wise error rate)."""
+    m = len(pvals)
+    order = np.argsort(pvals)
+    adjusted = np.empty(m)
+    running_max = 0.0
+    for rank, idx in enumerate(order):
+        adj = (m - rank) * pvals[idx]
+        running_max = max(running_max, adj)
+        adjusted[idx] = min(running_max, 1.0)
+    return adjusted.tolist()
+
+
+def per_level_tests(raw_data: dict) -> None:
+    """
+    Repeats H1/H2 within each concurrency level separately (repeat-run p95s,
+    n = repeats per group), avoiding the criticism that pooling across levels
+    mixes non-exchangeable operating points. Holm correction applied across
+    the five levels per hypothesis.
+    """
+    subsection("Per-concurrency-level tests (Holm-corrected across levels)")
+    n_reps = min(
+        (len(raw_data[arch][n]) for arch in ARCHS for n in raw_data[arch]),
+        default=0,
+    )
+    if n_reps < 4:
+        print(f"""
+  NOTE: with only {n_reps} repeats per cell the smallest achievable one-sided
+  exact Mann-Whitney p-value is {1/math.comb(2*n_reps, n_reps):.3f} — per-level significance is
+  underpowered and shown descriptively. Run the suite with REPEATS >= 5
+  (now the default in scripts/benchmark_pipelines.*) for confirmatory
+  per-level inference; the pooled tests above remain the primary analysis.""")
+
+    for hyp, arch_a, arch_b, label in [
+        ("H1", "synch", "baseline", "Synch > No-XAI"),
+        ("H2", "synch", "asynch",   "Synch > Asynch"),
+    ]:
+        rows, pvals = [], []
+        for n in CONCURRENCY_LEVELS:
+            a = [r["p95"] for r in raw_data[arch_a].get(n, [])]
+            b = [r["p95"] for r in raw_data[arch_b].get(n, [])]
+            if not a or not b:
+                continue
+            stat, p = mannwhitneyu(a, b, alternative="greater")
+            rows.append((n, np.median(a), np.median(b), p))
+            pvals.append(p)
+        adj = holm_correction(pvals)
+        print(f"\n  {hyp} per level: {label}  (one-sided MW on repeat-run p95s)")
+        print(f"  {'users':>6}  {'median A (ms)':>14}  {'median B (ms)':>14}  {'p':>8}  {'p (Holm)':>9}  sig")
+        for (n, ma, mb, p), pa in zip(rows, adj):
+            print(f"  {n:>6}  {ma:>14,.0f}  {mb:>14,.0f}  {p:>8.4f}  {pa:>9.4f}  {'*' if pa < 0.05 else ''}")
+
+    # H3 per level: descriptive ratio + TOST at the primary margin
+    print(f"\n  H3 per level: Asynch vs No-XAI  (p95 ratio + TOST at θ = {TOST_PRIMARY_MARGIN}x)")
+    print(f"  {'users':>6}  {'async p95':>10}  {'no-XAI p95':>11}  {'ratio':>6}  {'p_TOST':>8}  verdict")
+    for n in CONCURRENCY_LEVELS:
+        a = [r["p95"] for r in raw_data["asynch"].get(n, [])]
+        b = [r["p95"] for r in raw_data["baseline"].get(n, [])]
+        if not a or not b:
+            continue
+        res = run_tost(a, b, TOST_PRIMARY_MARGIN)
+        ratio = np.median(a) / max(np.median(b), 0.1)
+        print(f"  {n:>6}  {np.median(a):>10,.0f}  {np.median(b):>11,.0f}  {ratio:>5.2f}x  {res['p']:>8.4f}  "
+              f"{'equivalent' if res['equivalent'] else 'not shown equivalent'}")
 
 
 # ── Summary table ────────────────────────────────────────────────────────────
@@ -659,6 +781,16 @@ if __name__ == "__main__":
         alternative   = "two-sided",
     )
 
+    h3_tost = run_tost_sweep(
+        step   = "Step 3 (formal)",
+        name_a = "Asynch XAI", a = p95_samples["asynch"],
+        name_b = "No XAI",     b = p95_samples["baseline"],
+    )
+
+    # ── Per-level analysis ────────────────────────────────────────────────────
+    section("PER-CONCURRENCY-LEVEL ANALYSIS")
+    per_level_tests(raw_data)
+
     # ── Interpretation ────────────────────────────────────────────────────────
     section("INTERPRETATION")
 
@@ -676,10 +808,12 @@ if __name__ == "__main__":
   Asynchronous decoupling via Redis/Celery is a statistically validated
   architectural fix. p = {h2["p"]:.4f}, r = {h2["r"]} ({effect_label(h2["r"])} effect).
 
-  Step 3 — Ideal outcome:
-  {"ACHIEVED" if not h3["sig"] else "NOT ACHIEVED (scope limitation)"}
-  {"Async Tier-1 latency is statistically equivalent to the no-XAI floor. XAI is effectively free to the user." if not h3["sig"] else
-  f"Tier-1 SHAP runs synchronously before returning, adding measurable overhead under high concurrency (25+ users). Asynch XAI reduces tail latency by ~{(np.median(p95_samples['synch'])-np.median(p95_samples['asynch']))/np.median(p95_samples['synch'])*100:.0f}% vs Synch XAI (Step 2 confirmed) but does not fully reach the No XAI floor. p = {h3['p']:.4f}. Future work: precompute or cache Tier-1 explanations to close this gap."}
+  Step 3 — Ideal outcome (TOST equivalence, pre-registered margin {TOST_PRIMARY_MARGIN}x):
+  {"ACHIEVED" if h3_tost["primary"]["equivalent"] else "NOT FULLY ACHIEVED (scope limitation)"}
+  {f"Async Tier-1 p95 latency is formally equivalent to the no-XAI floor within a factor of {TOST_PRIMARY_MARGIN} (TOST p = {h3_tost['primary']['p']:.4f}). XAI is effectively free to the user." if h3_tost["primary"]["equivalent"] else
+  (f"Equivalence to the no-XAI floor holds only within a factor of {h3_tost['theta_star']}x (TOST). " if h3_tost["theta_star"] is not None else
+   f"Equivalence to the no-XAI floor could not be demonstrated at any tested margin up to {TOST_MARGINS[-1]}x. ")
+  + f"Asynch XAI still reduces tail latency by ~{(np.median(p95_samples['synch'])-np.median(p95_samples['asynch']))/np.median(p95_samples['synch'])*100:.0f}% vs Synch XAI (Step 2 confirmed). Two-sided MW p = {h3['p']:.4f} (descriptive). Future work: precompute or cache Tier-1 explanations to close the residual gap."}
 """)
 
     # ── Key quantitative findings ─────────────────────────────────────────────

@@ -1,4 +1,2 @@
 Method,Name,Error,Occurrences
-POST,/predict/asynch,CatchResponseError('HTTP 0'),10
-GET,/result/[task_id],"ReadTimeout(ReadTimeoutError(""HTTPConnectionPool(host='46.51.140.46', port=8000): Read timed out. (read timeout=10)""))",464
-GET,/result/[task_id],"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",2
+POST,/predict/asynch,CatchResponseError('HTTP 0'),25
