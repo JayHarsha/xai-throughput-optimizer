@@ -1,4 +1,15 @@
-data/
+# data/* not data/ — git cannot re-include a file whose parent dir is excluded,
+# so the negations below only work if the directory itself stays un-ignored.
+data/*
+# Held-out test split (20.9 MB) so notebook 02 runs from a fresh clone, plus the
+# three FRED series (public domain). The 1.6 GB raw Kaggle CSV stays out —
+# see the Configuration Manual for its download URL.
+!data/X_test.parquet
+!data/y_test.parquet
+!data/UNRATE.csv
+!data/CPIAUCSL.csv
+!data/FEDFUNDS.csv
+
 models/
 __pycache__/
 xai-asynch-env/
@@ -21,4 +32,13 @@ previous_aws_results/
 
 24245411_CA2_Practicum.docx
 BENCHMARK_CHANGELOG.md
+RUN_STEPS.txt
+PAPER_DRAFT.md
+WORK_PLAN.md
 
+reports/
+key_for_aws_instances/
+*.pem
+sample_papers/
+
+scripts/revise_report_copies.py

@@ -174,6 +174,13 @@ def queue_depth():
 
 @app.get("/metrics/live")
 async def live_metrics():
+    """
+    Rolling p50/p95/p99 per arm, last 200 requests.
+
+    Per-process, not per-service: request_log lives in one Gunicorn worker and
+    the API runs 4, so this sees roughly a quarter of traffic. Indicative only —
+    reported figures come from the Locust CSVs via analysis/mann_whitney.py.
+    """
     def calc(times):
         if not times:
             return {"p50_ms": 0, "p95_ms": 0, "p99_ms": 0, "request_count": 0}
@@ -192,4 +199,5 @@ async def live_metrics():
 
 @app.get("/")
 async def serve_dashboard():
-    return FileResponse("/app/dashboard.html")
+    # From BASE_DIR, not the container path, so this also works under plain uvicorn.
+    return FileResponse(os.path.join(BASE_DIR, "dashboard.html"))

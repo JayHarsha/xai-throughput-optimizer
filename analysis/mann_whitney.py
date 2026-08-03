@@ -25,12 +25,16 @@ Three hypotheses form a sequential chain of evidence:
       → If confirmed (p > 0.05): perfect. If rejected: Tier-1 SHAP
         still adds overhead under load — a scope limitation for future work.
 
-Input files:  results/locust_<arch>_<N>u_run<R>_stats.csv
+Usage:        python analysis/mann_whitney.py <results_dir>
+              aws_results          = the dissertation dataset (AWS, Locust 2.45.0)
+              local_pilot_results  = local pilot runs (Wi-Fi, Locust 2.19.0)
+
+Input files:  <results_dir>/stats/locust_<arch>_<N>u_run<R>_stats.csv
               arch in {baseline, synch, asynch},  N in {1, 5, 10, 25, 50}
 
-Outputs:      results/mann_whitney_report.txt
-              results/summary_table.csv
-              results/plots/  (7 figures)
+Outputs:      <results_dir>/mann_whitney_report.txt
+              <results_dir>/summary_table.csv
+              <results_dir>/plots/  (7 figures)
 """
 
 import math
@@ -47,11 +51,22 @@ from pathlib import Path
 from scipy.stats import mannwhitneyu
 
 # ── Paths ────────────────────────────────────────────────────────────────────
-# Optional CLI arg picks which results folder to analyze, e.g.:
-#   python analysis/mann_whitney.py            -> results/       (local runs)
-#   python analysis/mann_whitney.py aws_results -> aws_results/  (AWS runs)
-RESULTS_DIR_NAME = sys.argv[1] if len(sys.argv) > 1 else "results"
+# Required argument, no default: a bare run used to analyse the local pilot data
+# and produce wrong-but-plausible numbers indistinguishable from the real ones.
+if len(sys.argv) < 2:
+    sys.exit(
+        "\nUsage: python analysis/mann_whitney.py <results_dir>\n\n"
+        "  aws_results           the gen-5 AWS dataset reported in the dissertation\n"
+        "                        (in-VPC load generator, Locust 2.45.0)\n"
+        "  local_pilot_results   local pilot runs over Wi-Fi, Locust 2.19.0\n"
+        "                        (NOT the reported dataset)\n\n"
+        "No default is assumed — naming the directory prevents silently\n"
+        "analysing the wrong dataset.\n"
+    )
+RESULTS_DIR_NAME = sys.argv[1]
 RESULTS_DIR      = Path(__file__).parent.parent / RESULTS_DIR_NAME
+if not (RESULTS_DIR / "stats").is_dir():
+    sys.exit(f"\nERROR: '{RESULTS_DIR_NAME}/stats/' not found — is the directory name correct?\n")
 STATS_DIR    = RESULTS_DIR / "stats"      # only *_stats.csv is read for the Mann-Whitney report
 FAILURES_DIR = RESULTS_DIR / "failures"   # *_failures.csv — read only for the separate failure breakdown
 PLOTS_DIR    = RESULTS_DIR / "plots"
@@ -132,14 +147,27 @@ def collect_all(arch: str) -> dict[int, list[dict]]:
 
 
 def average_runs(runs: list[dict]) -> dict:
-    """Aggregate repeat runs at one concurrency level into a single summary point."""
+    """Aggregate repeat runs at one concurrency level into a single summary point.
+
+    Reports both mean and median: the asynchronous arm is bimodal at 25-50 users
+    (four runs at 200-590 ms plus one transient stall), so the mean is dominated
+    by the stall while the median describes the typical run. The hypothesis tests
+    use medians, so publishing only means made the tables contradict each other.
+    """
     total = sum(r["request_count"] for r in runs)
     fails = sum(r["failure_count"] for r in runs)
+    p95s  = [r["p95"] for r in runs]
     return {
         "p50":           float(np.mean([r["p50"] for r in runs])),
-        "p95":           float(np.mean([r["p95"] for r in runs])),
-        "p95_std":       float(np.std([r["p95"] for r in runs])),
+        "p50_median":    float(np.median([r["p50"] for r in runs])),
+        "p95":           float(np.mean(p95s)),
+        "p95_median":    float(np.median(p95s)),
+        "p95_min":       float(np.min(p95s)),
+        "p95_max":       float(np.max(p95s)),
+        "p95_std":       float(np.std(p95s)),
+        "p95_runs":      [float(x) for x in p95s],
         "p99":           float(np.mean([r["p99"] for r in runs])),
+        "p99_median":    float(np.median([r["p99"] for r in runs])),
         "req_s":         float(np.mean([r["req_s"] for r in runs])),
         "failure_rate":  round(fails / total * 100, 1) if total > 0 else 0.0,
         "request_count": total,
@@ -175,7 +203,7 @@ def write_failure_breakdown(failure_data: dict[str, dict[int, dict[str, int]]]) 
     with open(FAILURE_BREAKDOWN_PATH, "w", encoding="utf-8") as f:
         print("=" * 68, file=f)
         print("  Failure Reason Breakdown", file=f)
-        print("  Source: results/failures/*_failures.csv, summed across repeat runs", file=f)
+        print(f"  Source: {RESULTS_DIR_NAME}/failures/*_failures.csv, summed across repeat runs", file=f)
         print("  (Not part of the Mann-Whitney hypothesis tests — diagnostic only)", file=f)
         print("=" * 68, file=f)
 
@@ -455,18 +483,78 @@ def build_summary(all_data: dict) -> pd.DataFrame:
             d = all_data[arch].get(n)
             if d is None:
                 continue
+            # round(), not int() — int() truncated 21.8 ms to 21.
             rows.append({
                 "Architecture":      ARCH_LABELS[arch],
                 "Concurrent Users":  n,
-                "p50 (ms)":          int(d["p50"]),
-                "p95 (ms)":          int(d["p95"]),
-                "p99 (ms)":          int(d["p99"]),
+                "p50 (ms)":          round(d["p50"]),
+                "p95 mean (ms)":     round(d["p95"]),
+                "p95 median (ms)":   round(d["p95_median"]),
+                "p95 min (ms)":      round(d["p95_min"]),
+                "p95 max (ms)":      round(d["p95_max"]),
+                "p99 (ms)":          round(d["p99"]),
                 "Throughput (req/s)": round(d["req_s"], 2),
                 "Failure Rate (%)":   d["failure_rate"],
                 "Request Count":      d["request_count"],
                 "Repeats":            d["n_runs"],
             })
     return pd.DataFrame(rows)
+
+
+def print_per_run_p95(all_data: dict) -> None:
+    """Per-run p95s for every cell — a cell reported as "5,860 ms" is actually
+    {28000, 310, 200, 590, 200}. Cells whose mean/median diverge by >2x are
+    flagged as bimodal (a stall in a minority of runs, not uniform degradation).
+    """
+    subsection("Per-run p95 values (run-level distribution behind each cell)")
+    print(f"  {'arch':<11}{'users':>6}  {'mean':>8}  {'median':>8}  {'ratio':>6}   individual runs")
+    for arch in ARCHS:
+        for n in CONCURRENCY_LEVELS:
+            d = all_data[arch].get(n)
+            if d is None:
+                continue
+            mean, med = d["p95"], d["p95_median"]
+            ratio = mean / max(med, 1)
+            flag = "  <-- BIMODAL: mean driven by outlier run(s)" if ratio >= 2 else ""
+            print(f"  {ARCH_LABELS[arch]:<11}{n:>6}  {mean:>8,.0f}  {med:>8,.0f}  {ratio:>5.1f}x   "
+                  f"{[int(x) for x in d['p95_runs']]}{flag}")
+    print("\n  BIMODAL cells are not uniformly degraded — most runs sit near the median")
+    print("  and a minority stall. Quote the median plus the range, not the mean.")
+
+
+# ── Censoring audit ──────────────────────────────────────────────────────────
+# Clients abort at a uniform 30 s SLA, so a run whose p95 sits at the ceiling is
+# right-censored — the true value is ">= 30,000 ms", not "30,000 ms".
+SLA_CEILING_MS = 30_000
+CEILING_TOLERANCE = 0.93  # runs within 7% of the ceiling count as clipped
+
+# Mirrors gevent.sleep(2) before the first poll in tests/locust_asynch.py:
+# Tier-2 completions cannot be observed faster than this.
+POLLER_FLOOR_MS = 2_000
+
+
+def print_censoring_audit(raw_data: dict) -> None:
+    subsection("Right-censoring audit (runs clipped by the 30 s uniform SLA)")
+    found = False
+    for arch in ARCHS:
+        for n in CONCURRENCY_LEVELS:
+            runs = raw_data[arch].get(n, [])
+            if not runs:
+                continue
+            clipped = [r["p95"] for r in runs if r["p95"] >= SLA_CEILING_MS * CEILING_TOLERANCE]
+            if not clipped:
+                continue
+            found = True
+            note = ("fully censored — report as '>= 30,000 ms'"
+                    if len(clipped) == len(runs) else
+                    "partially censored — the cell mean is bounded by the SLA, not by the system")
+            print(f"  {ARCH_LABELS[arch]:<11}{n:>3}u : {len(clipped)}/{len(runs)} runs at the ceiling "
+                  f"{[int(x) for x in clipped]}  -> {note}")
+    if not found:
+        print("  No runs reached the SLA ceiling.")
+    else:
+        print("\n  Censored cells are lower bounds — state them as '>='. A fully censored")
+        print("  cell measures the client's patience, not the server.")
 
 
 # ── Plots ────────────────────────────────────────────────────────────────────
@@ -492,16 +580,24 @@ def save(fig, name):
 
 
 def plot_p95_latency(all_data):
-    """Figure 1 — p95 tail latency vs concurrency (log scale). Hero figure."""
+    """Figure 1 — p95 tail latency vs concurrency (log scale). Hero figure.
+
+    Median with min-max whiskers, not mean +/- std: on the bimodal asynch cells
+    the std is ~11,000 ms on a median of 310 ms, so symmetric error bars spanned
+    the whole log axis, and the mean put the line at 5,860 ms where the typical
+    run was 310 ms.
+    """
     fig, ax = plt.subplots(figsize=(10, 6))
     for arch in ARCHS:
         xs = [n for n in CONCURRENCY_LEVELS if n in all_data[arch]]
-        ys = [all_data[arch][n]["p95"] for n in xs]
-        errs = [all_data[arch][n].get("p95_std", 0) for n in xs]
-        ax.errorbar(xs, ys, yerr=errs, marker="o", linewidth=2.5, markersize=8,
-                    capsize=4, color=COLORS[arch], label=ARCH_LABELS[arch])
+        ys = [all_data[arch][n]["p95_median"] for n in xs]
+        lo = [ys[i] - all_data[arch][n]["p95_min"] for i, n in enumerate(xs)]
+        hi = [all_data[arch][n]["p95_max"] - ys[i] for i, n in enumerate(xs)]
+        ax.errorbar(xs, ys, yerr=[lo, hi], marker="o", linewidth=2.5, markersize=8,
+                    capsize=4, elinewidth=1.2, alpha=0.95,
+                    color=COLORS[arch], label=ARCH_LABELS[arch])
         for x, y in zip(xs, ys):
-            ax.annotate(f"{int(y):,} ms", xy=(x, y), xytext=(5, 7),
+            ax.annotate(f"{int(round(y)):,} ms", xy=(x, y), xytext=(5, 7),
                         textcoords="offset points", fontsize=8, color=COLORS[arch])
     ax.axhspan(0, 1000, alpha=0.04, color="green", label="< 1,000 ms zone")
     ax.axhline(1000, color="gray", linewidth=0.8, linestyle="--", alpha=0.5)
@@ -511,15 +607,23 @@ def plot_p95_latency(all_data):
     ax.set_xticks(CONCURRENCY_LEVELS)
     ax.set_xlabel("Concurrent Users", fontsize=12)
     ax.set_ylabel("p95 Tail Latency (log scale)", fontsize=12)
-    ax.set_title("p95 Tail Latency vs Concurrent Users  (error bars = std across repeat runs)", fontsize=14, fontweight="bold")
+    ax.set_title("p95 Tail Latency vs Concurrent Users\n(median of 5 repeat runs; whiskers = min-max across runs)",
+                 fontsize=13, fontweight="bold")
     ax.legend(fontsize=10)
     save(fig, "fig1_p95_latency.png")
 
 
 def plot_percentiles(all_data):
-    """Figure 2 — p50 / p95 / p99 per architecture, three subplots."""
+    """Figure 2 — p50 / p95 / p99 per architecture, three subplots.
+
+    Medians, matching fig1 and the hypothesis tests — mixing statistics would put
+    the same cell at 5,860 ms in one figure and 310 ms in another.
+    """
     fig, axes = plt.subplots(1, 3, figsize=(15, 5), sharey=False)
-    for ax, (metric, title) in zip(axes, [("p50", "p50 Median"), ("p95", "p95 Tail"), ("p99", "p99 Extreme Tail")]):
+    for ax, (metric, title) in zip(
+        axes,
+        [("p50_median", "p50 Median"), ("p95_median", "p95 Tail"), ("p99_median", "p99 Extreme Tail")],
+    ):
         for arch in ARCHS:
             xs, ys = _series(all_data, metric)[arch]
             ax.plot(xs, ys, marker="o", linewidth=2, markersize=6,
@@ -531,7 +635,8 @@ def plot_percentiles(all_data):
         ax.set_ylabel("Latency (ms)")
         ax.set_title(title, fontweight="bold")
         ax.legend(fontsize=8)
-    fig.suptitle("Latency Percentile Comparison Across All Architectures", fontweight="bold")
+    fig.suptitle("Latency Percentile Comparison Across All Architectures  (median of 5 repeat runs)",
+                 fontweight="bold")
     save(fig, "fig2_percentile_comparison.png")
 
 
@@ -595,44 +700,69 @@ def plot_boxplots(p95_samples: dict):
     save(fig, "fig5_boxplots.png")
 
 
-def plot_p95_heatmap(all_data):
-    """
-    Figure 6 — heatmap: architecture x concurrency, coloured by p95 latency (seconds).
-    Immediately shows which cells are dangerous (dark red) vs safe (dark green).
-    """
-    matrix = []
-    for arch in ARCHS:
-        row = [all_data[arch].get(n, {}).get("p95", np.nan) / 1000
-               for n in CONCURRENCY_LEVELS]
-        matrix.append(row)
-    df = pd.DataFrame(matrix,
-                      index=[ARCH_LABELS[a] for a in ARCHS],
-                      columns=[f"{n} users" for n in CONCURRENCY_LEVELS])
+# The former fig6 p95 heatmap was removed: same metric, statistic and cells as
+# fig1, so it added colour but no information. Replaced by the Tier-2 envelope.
 
-    fig, ax = plt.subplots(figsize=(11, 4.5))
-    sns.heatmap(df, annot=True, fmt=".2f", cmap="RdYlGn_r",
-                linewidths=0.5, ax=ax,
-                annot_kws={"size": 11, "weight": "bold"},
-                cbar_kws={"label": "p95 Latency (seconds)", "shrink": 0.8})
-    ax.set_yticklabels(ax.get_yticklabels(), rotation=0, va="center", fontsize=11)
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=0, fontsize=10)
-    ax.set_title("p95 Tail Latency Heatmap  (values in seconds)\nArchitecture × Concurrent Users",
-                 fontsize=13, fontweight="bold", pad=12)
-    ax.set_xlabel("Concurrent Users", fontsize=11, labelpad=8)
-    ax.set_ylabel("")
-    save(fig, "fig6_p95_heatmap.png")
+
+def plot_tier2_envelope(all_data, tier2_by_level):
+    """
+    Figure 6 — Tier-2 completion envelope: async relocates the Tier-2 cost rather
+    than eliminating it. Tier-1 stays far below the synchronous line at every
+    load, but Tier-2 completion crosses above it under saturation, so decoupling
+    stops paying once the deep explanation is what the user actually needs.
+    """
+    xs = [n for n in CONCURRENCY_LEVELS if n in tier2_by_level and n in all_data["asynch"]]
+    if not xs:
+        return
+    tier1 = [all_data["asynch"][n]["p95_median"] for n in xs]
+    tier2 = [tier2_by_level[n]["p95"] for n in xs]
+    synch = [all_data["synch"][n]["p95_median"] for n in xs]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(xs, tier1, marker="o", linewidth=2.5, markersize=8, color=COLORS["asynch"],
+            label="Asynch Tier-1 p95  (perceived latency)")
+    ax.plot(xs, tier2, marker="s", linewidth=2.5, markersize=8, color=COLORS["asynch"],
+            linestyle="--", alpha=0.85, label="Asynch Tier-2 p95  (deep analysis retrievable)")
+    ax.plot(xs, synch, marker="^", linewidth=2.5, markersize=8, color=COLORS["synch"],
+            label="Synch p95  (full explanation inline)")
+
+    # Labelled via the legend: inline text collided with the data labels sitting
+    # on the floor at 1 and 5 users.
+    ax.axhspan(0, POLLER_FLOOR_MS, alpha=0.10, color="gray",
+               label="2 s polling floor — Tier-2 unresolved below")
+    ax.axhline(POLLER_FLOOR_MS, color="gray", linewidth=0.9, linestyle=":", alpha=0.8)
+
+    for x, y in zip(xs, tier1):
+        ax.annotate(f"{y:,.0f}", xy=(x, y), xytext=(4, -12), textcoords="offset points",
+                    fontsize=8, color=COLORS["asynch"])
+    for x, y in zip(xs, tier2):
+        # Nudge the two floor-pinned labels clear of the band edge.
+        dy = 9 if y <= POLLER_FLOOR_MS * 1.05 else 6
+        ax.annotate(f"{y:,.0f}", xy=(x, y), xytext=(4, dy), textcoords="offset points",
+                    fontsize=8, color=COLORS["asynch"])
+
+    ax.set_yscale("log")
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f"{int(v):,} ms"))
+    ax.set_xticks(CONCURRENCY_LEVELS)
+    ax.set_xlabel("Concurrent Users", fontsize=12)
+    ax.set_ylabel("Latency (log scale)", fontsize=12)
+    ax.set_title("Tier-2 Completion Envelope: relocated cost, not eliminated cost\n"
+                 "(Tier-2 p95 crosses the synchronous line under saturation)",
+                 fontsize=13, fontweight="bold")
+    ax.legend(fontsize=9, loc="lower right")
+    save(fig, "fig6_tier2_envelope.png")
 
 
 def plot_speedup_ratio(all_data):
     """
-    Figure 7 — grouped bar chart (linear scale) showing actual p95 latency in seconds
-    for Synch XAI vs Asynch XAI. Speedup ratio annotated above each Asynch bar.
-    Advantage peaks at 10 users (16.7x) then narrows as Tier-1 SHAP saturates workers.
+    Figure 7 — grouped bars (linear scale) of p95 latency in seconds, Synch vs
+    Asynch, with the speedup ratio annotated above each Asynch bar. Medians,
+    matching fig1/fig2 and the hypothesis tests.
     """
     xs, ratios, synch_s_vals, asynch_s_vals = [], [], [], []
     for n in CONCURRENCY_LEVELS:
-        s = all_data["synch"].get(n, {}).get("p95")
-        a = all_data["asynch"].get(n, {}).get("p95")
+        s = all_data["synch"].get(n, {}).get("p95_median")
+        a = all_data["asynch"].get(n, {}).get("p95_median")
         if s and a and a > 0:
             xs.append(n)
             ratios.append(round(s / a, 1))
@@ -718,6 +848,12 @@ if __name__ == "__main__":
         arch: [run["p95"] for n in CONCURRENCY_LEVELS if n in raw_data[arch] for run in raw_data[arch][n]]
         for arch in ARCHS
     }
+    # The headline "Nx overhead" was computed from p95 but described as a median
+    # latency ratio — 173x vs 110x. Both are now computed and labelled.
+    p50_samples = {
+        arch: [run["p50"] for n in CONCURRENCY_LEVELS if n in raw_data[arch] for run in raw_data[arch][n]]
+        for arch in ARCHS
+    }
 
     # ── Summary table ─────────────────────────────────────────────────────────
     section("FULL RESULTS TABLE")
@@ -725,6 +861,9 @@ if __name__ == "__main__":
     print(df.to_string(index=False))
     df.to_csv(SUMMARY_PATH, index=False)
     print(f"\n  Saved to: {SUMMARY_PATH.name}")
+
+    print_per_run_p95(all_data)
+    print_censoring_audit(raw_data)
 
     # ── Descriptive statistics ────────────────────────────────────────────────
     section("DESCRIPTIVE STATISTICS  —  p95 Tail Latency Distribution")
@@ -797,9 +936,12 @@ if __name__ == "__main__":
     print(f"""
   Step 1 — Problem established:
   {"CONFIRMED" if h1["sig"] else "NOT CONFIRMED"}
-  Synch XAI adds {np.median(p95_samples["synch"])/np.median(p95_samples["baseline"]):.0f}x median
-  latency overhead vs No XAI. The bottleneck is XAI computation,
-  not API infrastructure. p = {h1["p"]:.4f}, r = {h1["r"]} ({effect_label(h1["r"])} effect).
+  Synch XAI inflates median p95 TAIL latency {np.median(p95_samples["synch"])/np.median(p95_samples["baseline"]):.0f}x vs No XAI
+  ({np.median(p95_samples["synch"]):,.0f} ms vs {np.median(p95_samples["baseline"]):,.0f} ms).
+  Median RESPONSE latency (p50) ratio is {np.median(p50_samples["synch"])/np.median(p50_samples["baseline"]):.0f}x ({np.median(p50_samples["synch"]):,.0f} ms vs {np.median(p50_samples["baseline"]):,.0f} ms).
+  These are different statistics — quote the one the surrounding text names.
+  The bottleneck is XAI computation, not API infrastructure.
+  p = {h1["p"]:.4f}, r = {h1["r"]} ({effect_label(h1["r"])} effect).
 
   Step 2 — Solution validated:
   {"CONFIRMED" if h2["sig"] else "NOT CONFIRMED"}
@@ -851,14 +993,26 @@ if __name__ == "__main__":
   (task_id returned). This section measures the real end-to-end time until
   the background SHAP-interactions + counterfactual analysis is retrievable
   via GET /result/{task_id} — i.e. what the user actually waits for.
+
+  MEASUREMENT FLOOR: locust_asynch.py sleeps 2 s before its first poll, so rows
+  at 2,000 ms are the instrumentation floor, not the true Tier-2 latency.
 """)
-        print(f"  {'Users':>6}  {'Tier-1 p95 (ms)':>16}  {'Tier-2 p50 (ms)':>16}  {'Tier-2 p95 (ms)':>16}  {'Tier-2 p99 (ms)':>16}  {'Completions':>12}")
+        print(f"  {'Users':>6}  {'Tier-1 p95 (ms)':>16}  {'Tier-2 p50 (ms)':>16}  {'Tier-2 p95 (ms)':>16}  {'Tier-2 p99 (ms)':>16}  {'Completions':>12}   note")
+        floored_levels = []
         for n in CONCURRENCY_LEVELS:
             tier1 = all_data["asynch"].get(n, {})
             tier2 = tier2_by_level.get(n)
             if not tier2:
                 continue
-            print(f"  {n:>6}  {tier1.get('p95', 0):>16,.0f}  {tier2['p50']:>16,.0f}  {tier2['p95']:>16,.0f}  {tier2['p99']:>16,.0f}  {tier2['request_count']:>12}")
+            at_floor = tier2["p50"] <= POLLER_FLOOR_MS * 1.01
+            if at_floor:
+                floored_levels.append(n)
+            note = "<-- AT POLLER FLOOR (upper bound)" if at_floor else ""
+            print(f"  {n:>6}  {tier1.get('p95', 0):>16,.0f}  {tier2['p50']:>16,.0f}  {tier2['p95']:>16,.0f}  "
+                  f"{tier2['p99']:>16,.0f}  {tier2['request_count']:>12}   {note}")
+        if floored_levels:
+            print(f"\n  Levels {floored_levels} are censored from below at {POLLER_FLOOR_MS:,} ms —")
+            print("  report them as upper bounds, not measurements.")
         print()
     else:
         print("\n  No tier2_completion data found — locust_asynch.py may predate the polling\n  instrumentation, or no Medium/High risk requests occurred.\n")
@@ -878,7 +1032,7 @@ if __name__ == "__main__":
     plot_throughput(all_data)
     plot_failure_rate(all_data)
     plot_boxplots(p95_samples)
-    plot_p95_heatmap(all_data)
+    plot_tier2_envelope(all_data, tier2_by_level)  # replaced the redundant p95 heatmap
     plot_speedup_ratio(all_data)
     print(f"All plots  →  {PLOTS_DIR}/")
     print("Done.")

@@ -1,27 +1,24 @@
 ====================================================================
   Failure Reason Breakdown
-  Source: results/failures/*_failures.csv, summed across repeat runs
+  Source: aws_results/failures/*_failures.csv, summed across repeat runs
   (Not part of the Mann-Whitney hypothesis tests — diagnostic only)
 ====================================================================
 
   No XAI
   ------------------------------------------------------------
-    25 users  (56 total failures)
-         56  (100.0%)  CatchResponseError('HTTP 0')
-    50 users  (185 total failures)
-        185  (100.0%)  CatchResponseError('HTTP 0')
+    No failures recorded.
 
   Synch XAI
   ------------------------------------------------------------
-    25 users  (22 total failures)
-         22  (100.0%)  CatchResponseError('HTTP 0')
-    50 users  (93 total failures)
-         93  (100.0%)  CatchResponseError('HTTP 0')
+    50 users  (84 total failures)
+         84  (100.0%)  CatchResponseError('HTTP 0')
 
   Asynch XAI
   ------------------------------------------------------------
-    25 users  (76 total failures)
-         76  (100.0%)  CatchResponseError('HTTP 0')
-    50 users  (162 total failures)
-        162  (100.0%)  CatchResponseError('HTTP 0')
+    10 users  (4 total failures)
+          4  (100.0%)  CatchResponseError('HTTP 0')
+    25 users  (14 total failures)
+         14  (100.0%)  CatchResponseError('HTTP 0')
+    50 users  (211 total failures)
+        211  (100.0%)  CatchResponseError('HTTP 0')
 

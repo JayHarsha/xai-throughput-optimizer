@@ -1051,7 +1051,8 @@ function submitSync() {
   }, 100);
 
   const ctrl = new AbortController();
-  const tOut = setTimeout(() => ctrl.abort(), 120000);
+  // 30 s on every arm — a per-arm timeout biases the failure comparison.
+  const tOut = setTimeout(() => ctrl.abort(), 30000);
 
   fetch(API_BASE + '/predict/synch', {
     method: 'POST',
@@ -1151,7 +1152,9 @@ async function runLoad(endpoint, n) {
 
   const payload = getPayload();
   const url = API_BASE + '/predict/' + endpoint;
-  const timeoutMs = endpoint === 'synch' ? 120000 : 30000;
+  // Uniform 30 s across all arms — identical client patience is what makes the
+  // failure-rate comparison meaningful (synch previously got 120 s here).
+  const timeoutMs = 30000;
 
   const t0wall = Date.now();
 

@@ -1,2 +1,2 @@
-Method,Name,Error,Occurrences
-POST,/predict/synch,CatchResponseError('HTTP 0'),28
+Method,Name,Error,Occurrences,First Seen,Last Seen
+POST,/predict/synch,CatchResponseError('HTTP 0'),20,2026-07-15T12:20:05Z,2026-07-15T12:20:08Z

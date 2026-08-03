@@ -1,2 +1,1 @@
-Method,Name,Error,Occurrences
-POST,/predict/baseline,CatchResponseError('HTTP 0'),65
+Method,Name,Error,Occurrences,First Seen,Last Seen
