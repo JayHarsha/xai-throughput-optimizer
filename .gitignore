@@ -35,6 +35,18 @@ BENCHMARK_CHANGELOG.md
 RUN_STEPS.txt
 PAPER_DRAFT.md
 WORK_PLAN.md
+REPORT_REVIEW_FINDINGS.md
+
+# Submission-support material — not part of the research artefact
+Lecturer Notes/
+Templates/
+viva/
+
+# Laptop pilot run. Superseded by aws_results/ and never cited as a result.
+# NOTE: these 192 files are already tracked, so this rule alone does nothing —
+# it only stops them being re-added. To actually drop them from the repo:
+#     git rm -r --cached local_pilot_results
+local_pilot_results/
 
 reports/
 key_for_aws_instances/

@@ -487,12 +487,17 @@ def build_summary(all_data: dict) -> pd.DataFrame:
             rows.append({
                 "Architecture":      ARCH_LABELS[arch],
                 "Concurrent Users":  n,
-                "p50 (ms)":          round(d["p50"]),
+                # Mean AND median for every percentile: the report's tables quote
+                # medians (the hypothesis tests operate on them), so publishing
+                # only the means made the summary untraceable from the report.
+                "p50 mean (ms)":     round(d["p50"]),
+                "p50 median (ms)":   round(d["p50_median"]),
                 "p95 mean (ms)":     round(d["p95"]),
                 "p95 median (ms)":   round(d["p95_median"]),
                 "p95 min (ms)":      round(d["p95_min"]),
                 "p95 max (ms)":      round(d["p95_max"]),
-                "p99 (ms)":          round(d["p99"]),
+                "p99 mean (ms)":     round(d["p99"]),
+                "p99 median (ms)":   round(d["p99_median"]),
                 "Throughput (req/s)": round(d["req_s"], 2),
                 "Failure Rate (%)":   d["failure_rate"],
                 "Request Count":      d["request_count"],
@@ -708,7 +713,7 @@ def plot_tier2_envelope(all_data, tier2_by_level):
     """
     Figure 6 — Tier-2 completion envelope: async relocates the Tier-2 cost rather
     than eliminating it. Tier-1 stays far below the synchronous line at every
-    load, but Tier-2 completion crosses above it under saturation, so decoupling
+    load, but Tier-2 completion exceeds it at every measured level, so decoupling
     stops paying once the deep explanation is what the user actually needs.
     """
     xs = [n for n in CONCURRENCY_LEVELS if n in tier2_by_level and n in all_data["asynch"]]
@@ -747,7 +752,7 @@ def plot_tier2_envelope(all_data, tier2_by_level):
     ax.set_xlabel("Concurrent Users", fontsize=12)
     ax.set_ylabel("Latency (log scale)", fontsize=12)
     ax.set_title("Tier-2 Completion Envelope: relocated cost, not eliminated cost\n"
-                 "(Tier-2 p95 crosses the synchronous line under saturation)",
+                 "(Tier-2 p95 exceeds the synchronous line at every load level)",
                  fontsize=13, fontweight="bold")
     ax.legend(fontsize=9, loc="lower right")
     save(fig, "fig6_tier2_envelope.png")
