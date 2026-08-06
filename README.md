@@ -49,41 +49,14 @@ minority stall completely — so both median and mean are reported.
 
 ## Architecture
 
-```
-                    ┌──────────────────────────────────────────┐
-   client ─────────►│ FastAPI  (Gunicorn, 4 Uvicorn workers)   │
-                    │                                          │
-                    │  /predict/baseline  inference only       │
-                    │  /predict/synch     inference + T1 + T2  │
-                    │  /predict/asynch    inference + T1       │
-                    └───────────────┬──────────────────────────┘
-   ◄─ decision + Tier-1 + task_id ──┤
-                                    │ Tier-2 job (Medium/High risk only)
-                                    ▼
-                            ┌───────────────┐
-                            │ Redis  queue  │
-                            └───────┬───────┘
-                                    │ workers pull
-                                    ▼
-                            ┌───────────────────────────────┐
-                            │ 3 workers  (0.5 vCPU each)    │
-                            │ SHAP interactions +           │
-                            │ counterfactual recourse       │
-                            └───────┬───────────────────────┘
-                                    │ store result
-                                    ▼
-                            ┌───────────────┐
-                            │ Redis  result │
-                            └───────┬───────┘
-                                    │
-   client ── GET /result/{task_id} ─┤
-   ◄──────── deep explanation ──────┘
-```
-
-**Full high-level design** — offline pipeline, the three serving arms, the risk gate, and
-the queue-decoupled Tier-2 path on a single 2 vCPU instance:
+The offline pipeline, the three serving arms, the risk gate, and the queue-decoupled
+Tier-2 path — all on a single 2 vCPU instance:
 
 ![High-level architecture of the two-tier asynchronous XAI pipeline](architecture/fig2-hld-architecture.png)
+
+`/predict/baseline` is inference only, `/predict/synch` runs Tier-1 and Tier-2 inline, and
+`/predict/asynch` returns Tier-1 immediately with a `task_id` the client polls at
+`GET /result/{task_id}`.
 
 Tier-2 is gated to Medium/High risk applicants (default probability ≥ 0.40) — 73% of the
 workload pool. Workers are CPU-capped so background explanation work can never starve the
