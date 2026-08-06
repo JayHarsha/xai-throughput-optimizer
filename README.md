@@ -16,6 +16,13 @@ and defer the heavy interaction values and counterfactual recourse to background
 Three architectures are benchmarked under identical conditions — the only variable is
 *where* the explanation is computed.
 
+## Method
+
+Six steps: the offline phase (1–3) produces the model artefacts; the online phase (4–6)
+builds the three-arm system, benchmarks it under load, and evaluates the results.
+
+![Research methodology — six steps from data gathering to statistical evaluation](architecture/fig1-methodology-pipeline.png)
+
 ## Results
 
 75 runs on AWS: 3 architectures × 5 concurrency levels × 5 repeats × 60 s, uniform 30 s
@@ -35,7 +42,7 @@ At 50 concurrent users — throughput **23.3 / 2.7 / 12.6** req/s and failure ra
 fails one request in ten at 50 users. Asynchronous decoupling cuts p95 by 98%, sustains
 4.7× the throughput, and halves the failure rate. But a pre-registered TOST equivalence
 test **rejects** equivalence with the no-XAI floor: Tier-1 SHAP still runs on the request
-path, costing 7–29 ms through 10 users. Asynchronous XAI is *affordable, not free*.
+path, costing 7–32 ms through 10 users. Asynchronous XAI is *affordable, not free*.
 
 The asynchronous arm is **bimodal** at 25–50 users — most runs sit near the median, a
 minority stall completely — so both median and mean are reported.
@@ -50,7 +57,7 @@ minority stall completely — so both median and mean are reported.
                     │  /predict/synch     inference + T1 + T2  │
                     │  /predict/asynch    inference + T1       │
                     └───────────────┬──────────────────────────┘
-   ◄─ decision + Tier-1 + task_id ──┘
+   ◄─ decision + Tier-1 + task_id ──┤
                                     │ Tier-2 job (Medium/High risk only)
                                     ▼
                             ┌───────────────┐
@@ -66,9 +73,17 @@ minority stall completely — so both median and mean are reported.
                                     │ store result
                                     ▼
                             ┌───────────────┐
-   client ── GET /result/{task_id} ─┤ Redis  result │
-   ◄─────── deep explanation ───────└───────────────┘
+                            │ Redis  result │
+                            └───────┬───────┘
+                                    │
+   client ── GET /result/{task_id} ─┤
+   ◄──────── deep explanation ──────┘
 ```
+
+**Full high-level design** — offline pipeline, the three serving arms, the risk gate, and
+the queue-decoupled Tier-2 path on a single 2 vCPU instance:
+
+![High-level architecture of the two-tier asynchronous XAI pipeline](architecture/fig2-hld-architecture.png)
 
 Tier-2 is gated to Medium/High risk applicants (default probability ≥ 0.40) — 73% of the
 workload pool. Workers are CPU-capped so background explanation work can never starve the
@@ -104,6 +119,11 @@ pytest tests/ -v                 # smoke-test the three arms against the running
 | `GET /` | Demo dashboard |
 
 ## Benchmarking
+
+All three arms share the same container stack, model artefacts, payload pool and 30 s
+client SLA — the only variable is where the explanation compute executes.
+
+![The three experimental arms — control, synchronous, and asynchronous two-tier](architecture/fig3-three-arm-benchmark.png)
 
 Run from a load generator **in the same VPC**, targeting the API's private IP — Wi-Fi
 jitter is comparable to the effect being measured.
